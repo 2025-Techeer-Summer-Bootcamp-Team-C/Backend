@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+static
+*.py[cod]
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Django DB
+db.sqlite3
+
+# macOS
+.DS_Store
+
+# VSCode 설정 (필요 시)
+.vscode/
+
+
