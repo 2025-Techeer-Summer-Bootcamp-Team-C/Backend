@@ -1,0 +1,65 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: MYSQL
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    networks:
+      - Backend-Net
+
+  backend:
+    container_name: Backend
+    build:
+      context: .
+    volumes:
+      - static_volume:/Backend/static
+    ports:
+      - "8000:8000"
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+      DATABASE_HOST: ${DATABASE_HOST}
+      DATABASE_NAME: ${DATABASE_NAME}
+      DATABASE_USER: ${DATABASE_USER}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+    networks:
+      - Backend-Net
+    restart: always
+    command: >
+      sh -c "python wait_mysql.py &&
+            python manage.py collectstatic --noinput &&
+            python manage.py makemigrations &&
+            python manage.py migrate &&
+            gunicorn --bind 0.0.0.0:8000 config.wsgi:application --timeout 300"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`backend.localhost`)"
+      - "traefik.http.services.backend.loadbalancer.server.port=8000"
+    privileged: true
+
+  traefik:
+    image: traefik:v2.10
+    container_name: Board-Traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - Backend-Net
+
+volumes:
+  db_data:
+  static_volume:
+
+networks:
+  Backend-Net:
+    driver: bridge
