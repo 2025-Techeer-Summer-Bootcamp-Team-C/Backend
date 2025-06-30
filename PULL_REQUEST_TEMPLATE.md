@@ -12,6 +12,6 @@
 
 ### 🎲 Issue Number
 
-<!-- Please enter {Issue Number} below to automatically close the connected issue. -->
+<!-- Please enter {Issue Number} below to automatically close the connected issue. -->
 
 close #{Issue Number}
