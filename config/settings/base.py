@@ -11,6 +11,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 SECRET_KEY = os.getenv("SECRET_KEY", "insecure-key")
 
+AUTH_USER_MODEL = 'user.User'  # 앱이름.모델이름
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -21,6 +23,7 @@ INSTALLED_APPS = [
     "corsheaders",
     'rest_framework',
     'drf_yasg',
+    'user',
 ]
 
 MIDDLEWARE = [
