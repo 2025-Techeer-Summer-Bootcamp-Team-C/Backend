@@ -1,7 +1,7 @@
 services:
   db:
     image: mysql:8.0
-    container_name: MYSQL
+    container_name: mysql
     ports:
       - "3306:3306"
     volumes:
@@ -35,24 +35,18 @@ services:
             python manage.py makemigrations &&
             python manage.py migrate &&
             gunicorn --bind 0.0.0.0:8000 config.wsgi:application --timeout 300"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.backend.rule=Host(`backend.localhost`)"
-      - "traefik.http.services.backend.loadbalancer.server.port=8000"
     privileged: true
 
-  traefik:
-    image: traefik:v2.10
-    container_name: Board-Traefik
-    command:
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--entrypoints.web.address=:80"
+  nginx:
+    image: nginx:latest
+    container_name: nginx
     ports:
       - "80:80"
-      - "8080:8080"
+      - "443:443"  # HTTPS를 사용할 경우
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - backend
     networks:
       - Backend-Net
 
