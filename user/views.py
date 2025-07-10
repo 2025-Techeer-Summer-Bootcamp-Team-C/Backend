@@ -1,7 +1,9 @@
 # user/views.py
+from rest_framework.views import APIView
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
-from .serializers import SignUpSerializer
+from .serializers import SignUpSerializer, LoginSerializer
+from drf_yasg.utils import swagger_auto_schema
 
 class SignUpAPI(generics.CreateAPIView):
     """
@@ -21,3 +23,14 @@ class SignUpAPI(generics.CreateAPIView):
         
         # 수정된 응답 반환
         return Response(response.data, status=status.HTTP_201_CREATED)
+
+class LoginAPI(APIView):
+    permission_classes = [permissions.AllowAny]  # 비로그인도 호출 가능
+
+    @swagger_auto_schema(request_body=LoginSerializer, responses={201: LoginSerializer})
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.validated_data, status=status.HTTP_201_CREATED)
+    
+    
