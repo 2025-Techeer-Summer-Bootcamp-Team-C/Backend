@@ -25,6 +25,8 @@ INSTALLED_APPS = [
     'drf_yasg',
     'user',
     'fitting',
+    'django_celery_results',
+    'django_celery_beat',
 ]
 
 MIDDLEWARE = [
@@ -127,3 +129,29 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Celery 설정 추가
+CELERY_BROKER_URL = 'amqp://guest:guest@rabbitmq:5672/'
+CELERY_ACCEPT_CONTENT = ['application/json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'Asia/Seoul'
+
+CELERY_TASK_TIME_LIMIT = 30 * 60
+
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+# Celery task를 종료 가능하게 해주는 세팅 (굉장히 중요)
+CELERY_TASK_REVOKE = True
+
+CELERYD_HIJACK_ROOT_LOGGER = False
+CELERYD_REDIRECT_STDOUTS = False
+
+CELERY_FLOWER_USER = 'root'  # Flower 웹 인터페이스 사용자 이름
+CELERY_FLOWER_PASSWORD = 'root'  # Flower 웹 인터페이스 비밀번호
+
+# CELERY_RESULT_BACKEND = 'rpc://'
+CELERY_RESULT_BACKEND = "django-db"
+
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://redis:6379/0')
