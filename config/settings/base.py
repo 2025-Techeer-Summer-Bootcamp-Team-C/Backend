@@ -3,9 +3,11 @@ from pathlib import Path
 import pymysql
 from datetime import timedelta
 from dotenv import load_dotenv
+from kombu import Queue
 
 pymysql.install_as_MySQLdb()
 load_dotenv()
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
