@@ -5,6 +5,8 @@ from .models import User
 
 
 class SignUpSerializer(serializers.ModelSerializer):
+    username = serializers.CharField()
+    email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
     password2 = serializers.CharField(write_only=True)
 
@@ -15,14 +17,14 @@ class SignUpSerializer(serializers.ModelSerializer):
     def validate(self, data):
         if data["password"] != data["password2"]:
             raise serializers.ValidationError("비밀번호가 일치하지 않습니다.")
+        if User.objects.filter(username=data["username"]).exists():
+            raise serializers.ValidationError("이미 사용 중인 ID 입니다.")
         return data
 
     def create(self, validated_data):
         validated_data.pop("password2")
         password = validated_data.pop("password")
-        user = User(**validated_data)
-        user.set_password(password)   # 해시 적용
-        user.save()
+        user = User.objects.create_user(password=password, **validated_data)
         return user
     
 class LoginSerializer(serializers.Serializer):
@@ -30,7 +32,7 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
 
     def validate(self, data):
-        user = authenticate(  # 아이디·비밀번호 체크
+        user = authenticate(  
             username=data["username"],
             password=data["password"],
         )
