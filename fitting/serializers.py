@@ -12,3 +12,8 @@ class VTORequestSerializer(serializers.Serializer):
 class GenerateVTORequestSerializer(serializers.Serializer):
     person_image_id = serializers.CharField(help_text="사람 이미지 ID")
     outfit_image_id = serializers.CharField(help_text="옷 이미지 ID")
+
+class GenerateVTOProductRequestSerializer(serializers.Serializer):
+    person_image_url  = serializers.URLField()
+    outfit_image_url  = serializers.URLField()
+    category = serializers.CharField()
