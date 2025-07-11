@@ -2,9 +2,11 @@ from pathlib import Path
 import pymysql
 from datetime import timedelta
 from dotenv import load_dotenv
+from kombu import Queue
 
 pymysql.install_as_MySQLdb()
 load_dotenv()
+
 
 import os
 api_key = os.environ.get("OPENAI_API_KEY")
@@ -25,8 +27,12 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "corsheaders",
     'rest_framework',
+    "rest_framework_simplejwt",
     'drf_yasg',
     'user',
+    'fitting',
+    'django_celery_results',
+    'django_celery_beat',
 ]
 
 MIDDLEWARE = [
@@ -43,6 +49,7 @@ MIDDLEWARE = [
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "http://127.0.0.1:8000",
 ]
 CORS_ALLOW_HEADERS = [
     'authorization',
@@ -89,17 +96,30 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',  # 필요 시 헤더 인증
-    ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',  # 인증된 사용자만 허용
-        # 'rest_framework.permissions.AllowAny',
-    ],
-    # 기타 설정들...
+SIMPLE_JWT = {
+    # (기존 ACCESS_TOKEN_LIFETIME 등은 그대로)
+    "AUTH_COOKIE_ACCESS": "access",     # 쿠키 이름
+    "AUTH_COOKIE_REFRESH": "refresh",
+    "AUTH_COOKIE_SAMESITE": "Lax",
 }
 
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        # 쿠키 먼저, 헤더(JWT) 백업용으로 두 번째
+        "user.authentication.CookieJWTAuthentication",
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+        # 로그인·회원가입 같은 엔드포인트엔 뷰 단에서 AllowAny 지정
+    ],
+}
+
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # 프런트엔드 주소
+    "http://127.0.0.1:8000",
+]
 
 SWAGGER_SETTINGS = {
     'SECURITY_DEFINITIONS': {
@@ -111,6 +131,7 @@ SWAGGER_SETTINGS = {
         }
     },
     'USE_SESSION_AUTH': False,  # 세션 인증 비활성화 (JWT만 사용)
+    'FETCH_WITH_CREDENTIALS': True, 
 }
 
 
@@ -129,3 +150,34 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+
+# Celery 설정 추가
+CELERY_BROKER_URL = 'amqp://guest:guest@rabbitmq:5672/'
+CELERY_ACCEPT_CONTENT = ['application/json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'Asia/Seoul'
+
+CELERY_TASK_TIME_LIMIT = 30 * 60
+
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+# Celery task를 종료 가능하게 해주는 세팅 (굉장히 중요)
+CELERY_TASK_REVOKE = True
+
+CELERYD_HIJACK_ROOT_LOGGER = False
+CELERYD_REDIRECT_STDOUTS = False
+
+CELERY_FLOWER_USER = 'root'  # Flower 웹 인터페이스 사용자 이름
+CELERY_FLOWER_PASSWORD = 'root'  # Flower 웹 인터페이스 비밀번호
+
+# CELERY_RESULT_BACKEND = 'rpc://'
+CELERY_RESULT_BACKEND = "django-db"
+
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://redis:6379/0')
