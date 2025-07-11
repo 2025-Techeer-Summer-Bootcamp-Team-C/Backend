@@ -2,11 +2,11 @@
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth import authenticate
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from django.conf import settings
-from .serializers import SignUpSerializer, LoginSerializer
+from .serializers import SignUpSerializer, LoginSerializer, LogoutSerializer
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -64,4 +64,23 @@ class LoginView(APIView):
         resp.set_cookie("refresh", data["refresh_token"],
                         httponly=True, samesite="Lax",
                         secure=not settings.DEBUG, path="/", max_age=60*60*24*7)
+        return resp
+    
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]  # access 쿠키 필수
+
+    @swagger_auto_schema(
+        operation_summary="로그아웃",
+        request_body=LogoutSerializer,
+        responses={204: "로그아웃 완료", 400: "잘못된 토큰"},
+    )
+    def post(self, request):
+        serializer = LogoutSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        resp = Response(status=status.HTTP_204_NO_CONTENT)
+        # 쿠키 삭제(클라이언트에서 지우도록 max_age=0)
+        resp.delete_cookie("access",  path="/", domain="127.0.0.1")  # domain 값은 로그인과 동일
+        resp.delete_cookie("refresh", path="/", domain="127.0.0.1")
         return resp

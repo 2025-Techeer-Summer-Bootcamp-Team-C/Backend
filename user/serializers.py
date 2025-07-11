@@ -41,3 +41,18 @@ class LoginSerializer(serializers.Serializer):
 
         data["user"] = user
         return data
+    
+class LogoutSerializer(serializers.Serializer):
+    refresh_token = serializers.CharField()
+
+    def validate(self, attrs):
+        from rest_framework_simplejwt.tokens import RefreshToken, TokenError
+        try:
+            self.token = RefreshToken(attrs["refresh_token"])
+        except TokenError:
+            raise serializers.ValidationError("잘못되었거나 만료된 토큰입니다.")
+        return attrs
+
+    def save(self, **kwargs):
+        # 블랙리스트 테이블에 저장 → 더 이상 재사용 불가
+        self.token.blacklist()
