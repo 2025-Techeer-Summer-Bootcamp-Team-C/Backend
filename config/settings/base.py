@@ -13,7 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 SECRET_KEY = os.getenv("SECRET_KEY", "insecure-key")
 
-AUTH_USER_MODEL = 'user.User'  # 앱이름.모델이름
+AUTH_USER_MODEL = 'user.User'  
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -94,27 +94,24 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 SIMPLE_JWT = {
-    # (기존 ACCESS_TOKEN_LIFETIME 등은 그대로)
-    "AUTH_COOKIE_ACCESS": "access",     # 쿠키 이름
+    "AUTH_COOKIE_ACCESS": "access",     
     "AUTH_COOKIE_REFRESH": "refresh",
     "AUTH_COOKIE_SAMESITE": "Lax",
 }
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        # 쿠키 먼저, 헤더(JWT) 백업용으로 두 번째
         "user.authentication.CookieJWTAuthentication",
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
-        # 로그인·회원가입 같은 엔드포인트엔 뷰 단에서 AllowAny 지정
     ],
 }
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # 프런트엔드 주소
+    "http://localhost:3000",  
     "http://127.0.0.1:8000",
 ]
 
