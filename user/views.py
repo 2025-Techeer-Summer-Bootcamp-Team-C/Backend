@@ -10,8 +10,10 @@ from .serializers import SignUpSerializer, LoginSerializer, LogoutSerializer
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from .models import User
-
+from django.conf import settings
 
 class SignUpAPI(generics.CreateAPIView):
     serializer_class = SignUpSerializer
@@ -83,4 +85,56 @@ class LogoutView(APIView):
         # 쿠키 삭제(클라이언트에서 지우도록 max_age=0)
         resp.delete_cookie("access",  path="/", domain="127.0.0.1")  # domain 값은 로그인과 동일
         resp.delete_cookie("refresh", path="/", domain="127.0.0.1")
+        return resp
+    
+class CookieTokenRefreshView(TokenRefreshView):
+    """
+    쿠키에서 refresh 토큰을 읽어 access 토큰 재발급
+    (요청 body에 refresh 필드를 줘도 동작)
+    """
+    serializer_class = TokenRefreshSerializer        # 그대로 사용
+
+    @swagger_auto_schema(
+        operation_summary="Access 토큰 재발급",
+        operation_description="만료된 access 대신 refresh 토큰으로 새 access 토큰을 발급합니다.",
+        # body 없이도 호출할 수 있으므로 request_body=None
+        responses={200: "재발급 성공", 401: "refresh 토큰 오류"}
+    )
+    def post(self, request, *args, **kwargs):
+        # ① refresh 토큰 추출: 쿠키 > body 순
+        refresh_token = (
+            request.COOKIES.get("refresh") or
+            request.data.get("refresh")
+        )
+        if not refresh_token:
+            return Response({"error": "refresh 토큰이 없습니다."},
+                            status=status.HTTP_401_UNAUTHORIZED)
+
+        # ② Simple JWT 기본 serializer 재사용
+        serializer = self.get_serializer(data={"refresh": refresh_token})
+        try:
+            serializer.is_valid(raise_exception=True)
+        except Exception as e:
+            return Response({"error": "유효하지 않은 refresh 토큰"},
+                            status=status.HTTP_401_UNAUTHORIZED)
+
+        access_token = serializer.validated_data["access"]
+
+        # ③ 새 access 토큰을 쿠키+본문에 포함
+        resp = Response(
+            {
+                "access_token": access_token,
+                "refresh_token": refresh_token,  
+            },
+            status=status.HTTP_200_OK
+        )
+        resp.set_cookie(
+            key="access",
+            value=access_token,
+            httponly=True,
+            samesite="Lax",
+            secure=not settings.DEBUG,
+            path="/",
+            max_age=60 * 15,    
+        )
         return resp
