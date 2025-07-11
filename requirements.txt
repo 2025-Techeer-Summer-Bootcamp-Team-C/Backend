@@ -28,3 +28,4 @@ django-celery-beat==2.8.0
 django_celery_results==2.6.0
 kombu==5.5.3
 boto3==1.39.4
+django-storages==1.14.6
