@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 import pymysql
 from datetime import timedelta
@@ -6,6 +5,10 @@ from dotenv import load_dotenv
 
 pymysql.install_as_MySQLdb()
 load_dotenv()
+
+import os
+api_key = os.environ.get("OPENAI_API_KEY")
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 

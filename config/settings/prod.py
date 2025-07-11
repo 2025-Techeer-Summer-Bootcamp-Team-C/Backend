@@ -1,6 +1,6 @@
 from .base import *
 
-DEBUG = False
+DEBUG = True
 ALLOWED_HOSTS = ["*"]  # 실제 도메인 또는 서버 IP
 
 DATABASES = {
