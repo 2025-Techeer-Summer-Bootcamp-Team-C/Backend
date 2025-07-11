@@ -15,18 +15,19 @@ schema_view = get_schema_view(
         license=openapi.License(name="BSD License"),
     ),
     public=True,
+    url="http://127.0.0.1:8000",
     permission_classes=(permissions.AllowAny,),
     # authentication_classes=[],  # 인증 클래스 비워두기 (Swagger에만 적용)
 )
 
 urlpatterns = [
-    path("api/", include("user.urls")),  
     
     re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     path("api/v1/", include([
         path("fittings/", include('fitting.urls')),
+        path("users/", include("user.urls")),  
     ])),
 ]
 

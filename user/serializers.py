@@ -37,12 +37,5 @@ class LoginSerializer(serializers.Serializer):
         if user is None:
             raise serializers.ValidationError("아이디 또는 비밀번호가 올바르지 않습니다.")
 
-        # 토큰 생성 (refresh는 필요 없어서 버림)
-        refresh = RefreshToken.for_user(user)
-        access = str(refresh.access_token)
-
-        return {
-            "status": 201,
-            "access_token": access,
-            "message": "로그인 성공",
-        }
+        data["user"] = user
+        return data
