@@ -10,11 +10,11 @@ from django.conf import settings
 from openai import OpenAI
 from rest_framework.parsers import MultiPartParser, FormParser
 import base64
-from .serializers import GenerateVTORequestSerializer, VTORequestSerializer
+from .serializers import GenerateVTORequestSerializer, VTORequestSerializer, GenerateVTOProductRequestSerializer
 import requests
 from rest_framework.permissions import AllowAny
 from celery import chord
-from .tasks import run_vto_task, collect_paths
+from .tasks import run_vto_task, collect_paths, run_vto_url_task
 
 BITSTUDIO_API_KEY = os.getenv("BITSTUDIO_API_KEY")
 load_dotenv()
@@ -93,7 +93,7 @@ class VTOOneShotView(GenericAPIView):
             "Frontal shot, arms crossed. " + base_prompt,
             "Frontal shot, hands in pockets. " + base_prompt,
             "Standing at attention. " + base_prompt,
-]
+            ]
 
         # 4) Celery chord 실행
         header = [run_vto_task.s(person_id, outfit_id, p) for p in prompts]
@@ -129,3 +129,73 @@ class VTOOneShotView(GenericAPIView):
         )
         res.raise_for_status()
         return res.json()["id"]
+    
+class VTOProductView(GenericAPIView):
+    permission_classes = [AllowAny]
+    serializer_class   = GenerateVTOProductRequestSerializer
+
+    @swagger_auto_schema(
+        operation_summary="상품-URL VTO (2장 병렬)",
+        request_body=GenerateVTOProductRequestSerializer,   # ← 새 스키마
+        responses={200: openapi.Response("OK")},
+    )
+    def post(self, request):
+        # 1) 입력 검증
+        ser = self.get_serializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        d = ser.validated_data
+
+        person_url  = d["person_image_url"]
+        outfit_url  = d["outfit_image_url"]
+        category    = d["category"]        # 상의 / 하의 / 기타
+
+        # 2) 카테고리에 따라 안내 문구(garment_clause) 결정
+        if category == "상의":
+            garment_clause = (
+                "Replace only the upper garment with the input clothing, "
+                "leaving all other clothes unchanged. "
+            )
+        elif category == "하의":
+            garment_clause = (
+                "Replace only the lower garment with the input clothing, "
+                "leaving all other clothes unchanged. "
+            )
+        else:
+            garment_clause = ""
+
+        # 3) 공통 프롬프트 (category 반영)
+        base_prompt = (
+            "Generate a realistic, high-quality full-body image of the input person "
+            "wearing the input clothing. "
+            f"{garment_clause}"
+            "Ensure the clothes fit naturally to the body shape and preserve the "
+            "person's facial features, skin tone, and hair. "
+        )
+
+        prompts = [
+            base_prompt,                                  # ① 현재 자세
+            "Standing at attention. " + base_prompt,      # ② 차렷 자세
+        ]
+
+        # 4) Celery chord (2개 병렬)
+        header = [
+            run_vto_url_task.s(person_url, outfit_url, p)
+            for p in prompts
+        ]
+        result_async = chord(header)(collect_paths.s())
+
+        try:
+            paths = result_async.get(timeout=120)  # [path1, path2] or None
+        except Exception as exc:
+            return Response(
+                {"error": f"VTO 작업 수집 실패: {exc}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        if any(p is None for p in paths):
+            return Response(
+                {"error": "VTO 생성 실패/타임아웃", "paths": paths},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response({"paths": paths}, status=200)
