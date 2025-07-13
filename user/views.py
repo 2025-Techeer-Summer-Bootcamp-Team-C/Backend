@@ -6,7 +6,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from django.conf import settings
-from .serializers import SignUpSerializer, LoginSerializer, LogoutSerializer
+from .serializers import SignUpSerializer, LoginSerializer, LogoutSerializer, WishlistProductCreateSerializer
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -138,3 +138,30 @@ class CookieTokenRefreshView(TokenRefreshView):
             max_age=60 * 15,    
         )
         return resp
+    
+    
+class WishlistProductCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="위시리스트 저장",
+        request_body=WishlistProductCreateSerializer,
+        responses={
+            201: openapi.Response(
+                description="생성 성공",
+                examples={
+                    "application/json": {"message": "상품이 위시리스트에 추가되었습니다."}
+                },
+            ),
+            400: "잘못된 요청 또는 중복",
+            401: "로그인 필요",
+        },
+    )
+    def post(self, request):
+        serializer = WishlistProductCreateSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(
+            {"message": "상품이 위시리스트에 추가되었습니다."},
+            status=status.HTTP_201_CREATED,
+        )

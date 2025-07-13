@@ -150,6 +150,23 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": os.getenv("DATABASE_NAME", "test"),       # test
+        "USER": os.getenv("DATABASE_USER", "root"),       # root
+        "PASSWORD": os.getenv("DATABASE_PASSWORD", "1234"),
+        "HOST": os.getenv("DATABASE_HOST", "db"),         # 도커 서비스명
+        "PORT": "3306",
+        "OPTIONS": {
+            "charset": "utf8mb4",
+            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+        },
+    }
+}
+
+
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
