@@ -4,4 +4,5 @@ from .views import *
 urlpatterns = [
     path('images',VTOOneShotView.as_view(),name='generate_vto'),
     path('images/products',VTOProductView.as_view(),name='generate_vto_product'),
+    path('images/test',VTOTestView.as_view(),name='vto_test'),
 ]

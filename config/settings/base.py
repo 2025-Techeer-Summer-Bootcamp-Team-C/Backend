@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'fitting',
     'django_celery_results',
     'django_celery_beat',
+    'storages',
 ]
 
 MIDDLEWARE = [
@@ -179,3 +180,18 @@ CELERY_RESULT_BACKEND = "django-db"
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://redis:6379/0')
+
+AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
+AWS_S3_CUSTOM_DOMAIN = os.getenv('AWS_S3_CUSTOM_DOMAIN')
+
+DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+
+AWS_S3_OBJECT_PARAMETERS = {
+    'CacheControl': 'max-age=86400',
+}
+
+AWS_DEFAULT_ACL = None
+
+MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/'
