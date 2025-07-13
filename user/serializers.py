@@ -5,6 +5,8 @@ from .models import User
 
 
 class SignUpSerializer(serializers.ModelSerializer):
+    username = serializers.CharField()
+    email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
     password2 = serializers.CharField(write_only=True)
 
@@ -15,14 +17,14 @@ class SignUpSerializer(serializers.ModelSerializer):
     def validate(self, data):
         if data["password"] != data["password2"]:
             raise serializers.ValidationError("비밀번호가 일치하지 않습니다.")
+        if User.objects.filter(username=data["username"]).exists():
+            raise serializers.ValidationError("이미 사용 중인 ID 입니다.")
         return data
 
     def create(self, validated_data):
         validated_data.pop("password2")
         password = validated_data.pop("password")
-        user = User(**validated_data)
-        user.set_password(password)   # 해시 적용
-        user.save()
+        user = User.objects.create_user(password=password, **validated_data)
         return user
     
 class LoginSerializer(serializers.Serializer):
@@ -30,19 +32,27 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
 
     def validate(self, data):
-        user = authenticate(  # 아이디·비밀번호 체크
+        user = authenticate(  
             username=data["username"],
             password=data["password"],
         )
         if user is None:
             raise serializers.ValidationError("아이디 또는 비밀번호가 올바르지 않습니다.")
 
-        # 토큰 생성 (refresh는 필요 없어서 버림)
-        refresh = RefreshToken.for_user(user)
-        access = str(refresh.access_token)
+        data["user"] = user
+        return data
+    
+class LogoutSerializer(serializers.Serializer):
+    refresh_token = serializers.CharField()
 
-        return {
-            "status": 201,
-            "access_token": access,
-            "message": "로그인 성공",
-        }
+    def validate(self, attrs):
+        from rest_framework_simplejwt.tokens import RefreshToken, TokenError
+        try:
+            self.token = RefreshToken(attrs["refresh_token"])
+        except TokenError:
+            raise serializers.ValidationError("잘못되었거나 만료된 토큰입니다.")
+        return attrs
+
+    def save(self, **kwargs):
+        # 블랙리스트 테이블에 저장 → 더 이상 재사용 불가
+        self.token.blacklist()

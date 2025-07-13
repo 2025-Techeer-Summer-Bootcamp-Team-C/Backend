@@ -7,7 +7,6 @@ class User(AbstractUser):
         ('F', 'Female'),
     )
 
-    # ERD 필드 매핑
     user_gender = models.CharField(
         max_length=1,
         choices=GENDER_CHOICES,
@@ -23,4 +22,4 @@ class User(AbstractUser):
         return f"{self.username} ({self.email})"
 
     class Meta:
-        db_table = 'user'  # 테이블명을 user 로 고정
+        db_table = 'user'  

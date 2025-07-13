@@ -14,3 +14,4 @@ COPY . ./
 
 RUN python manage.py collectstatic --noinput
 
+RUN pip install google-generativeai

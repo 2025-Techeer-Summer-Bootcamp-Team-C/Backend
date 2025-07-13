@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 import pymysql
 from datetime import timedelta
@@ -9,11 +8,15 @@ pymysql.install_as_MySQLdb()
 load_dotenv()
 
 
+import os
+api_key = os.environ.get("OPENAI_API_KEY")
+
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 SECRET_KEY = os.getenv("SECRET_KEY", "insecure-key")
 
-AUTH_USER_MODEL = 'user.User'  # 앱이름.모델이름
+AUTH_USER_MODEL = 'user.User'  
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -25,6 +28,7 @@ INSTALLED_APPS = [
     "corsheaders",
     'rest_framework',
     "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
     'drf_yasg',
     'user',
     'fitting',
@@ -47,6 +51,7 @@ MIDDLEWARE = [
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "http://127.0.0.1:8000",
 ]
 CORS_ALLOW_HEADERS = [
     'authorization',
@@ -93,17 +98,27 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',  # 필요 시 헤더 인증
-    ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',  # 인증된 사용자만 허용
-        # 'rest_framework.permissions.AllowAny',
-    ],
-    # 기타 설정들...
+SIMPLE_JWT = {
+    "AUTH_COOKIE_ACCESS": "access",     
+    "AUTH_COOKIE_REFRESH": "refresh",
+    "AUTH_COOKIE_SAMESITE": "Lax",
 }
 
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "user.authentication.CookieJWTAuthentication",
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
+
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  
+    "http://127.0.0.1:8000",
+]
 
 SWAGGER_SETTINGS = {
     'SECURITY_DEFINITIONS': {
@@ -115,6 +130,7 @@ SWAGGER_SETTINGS = {
         }
     },
     'USE_SESSION_AUTH': False,  # 세션 인증 비활성화 (JWT만 사용)
+    'FETCH_WITH_CREDENTIALS': True, 
 }
 
 
@@ -133,6 +149,11 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
 
 # Celery 설정 추가
 CELERY_BROKER_URL = 'amqp://guest:guest@rabbitmq:5672/'

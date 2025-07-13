@@ -15,8 +15,8 @@ schema_view = get_schema_view(
         license=openapi.License(name="BSD License"),
     ),
     public=True,
+    url="http://127.0.0.1:8000",
     permission_classes=(permissions.AllowAny,),
-    # authentication_classes=[],  # 인증 클래스 비워두기 (Swagger에만 적용)
 )
 
 urlpatterns = [
@@ -26,6 +26,7 @@ urlpatterns = [
     path("api/v1/", include([
         path("fittings/", include('fitting.urls')),
         path("users/", include("user.urls")),  
+        path('style/', include('style.urls')),
     ])),
 ]
 
