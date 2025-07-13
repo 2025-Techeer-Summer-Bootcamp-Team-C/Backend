@@ -17,3 +17,7 @@ class GenerateVTOProductRequestSerializer(serializers.Serializer):
     person_image_url  = serializers.URLField()
     outfit_image_url  = serializers.URLField()
     category = serializers.CharField()
+
+class VTOTestRequestSerializer(serializers.Serializer):
+    person_image = serializers.ImageField()
+    outfit_image = serializers.ImageField()
