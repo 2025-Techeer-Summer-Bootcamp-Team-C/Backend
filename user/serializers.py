@@ -1,7 +1,7 @@
 from django.contrib.auth import authenticate
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import User
+from .models import User, WishlistProduct
 
 
 class SignUpSerializer(serializers.ModelSerializer):
@@ -56,3 +56,30 @@ class LogoutSerializer(serializers.Serializer):
     def save(self, **kwargs):
         # 블랙리스트 테이블에 저장 → 더 이상 재사용 불가
         self.token.blacklist()
+        
+        
+
+class WishlistProductCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WishlistProduct
+        fields = (
+            "product_name",
+            "url",
+            "price",
+            "image_url",
+            "brand",
+        )
+
+    # 중복 체크 커스텀 검증
+    def validate(self, attrs):
+        user = self.context["request"].user
+        if WishlistProduct.objects.filter(
+            user=user, url=attrs.get("url")
+        ).exists():
+            raise serializers.ValidationError("이미 위시리스트에 있는 상품입니다.")
+        return attrs
+
+    def create(self, validated_data):
+        return WishlistProduct.objects.create(
+            user=self.context["request"].user, **validated_data
+        )
