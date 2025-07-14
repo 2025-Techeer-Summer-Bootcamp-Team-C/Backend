@@ -13,9 +13,4 @@ class User(AbstractUser):
     class Meta:
         db_table = 'user'  
         
-    profile_image = models.ImageField(
-        upload_to="profiles/",      # media/profiles/ 밑으로 저장
-        null=True, blank=True,
-        verbose_name="프로필 사진"
-    )
-        
+    profile_image = models.CharField(max_length=255, null=True, blank=True,verbose_name="사용자 사진 이미지 주소")
