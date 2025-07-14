@@ -2,7 +2,7 @@ from django.contrib.auth import authenticate
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import User, WishlistProduct
-
+from fitting.models import FittingResult 
 
 class SignUpSerializer(serializers.ModelSerializer):
     username = serializers.CharField()
@@ -57,17 +57,24 @@ class LogoutSerializer(serializers.Serializer):
         # 블랙리스트 테이블에 저장 → 더 이상 재사용 불가
         self.token.blacklist()
         
+class FittingResultSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FittingResult
+        fields = ("fitting_photo_url", "fitting_video_url", "created_at")
         
-
 class WishlistProductCreateSerializer(serializers.ModelSerializer):
+    product_id = serializers.IntegerField(source="id", read_only=True)
+    fitting_result = FittingResultSerializer(read_only=True)
     class Meta:
         model = WishlistProduct
         fields = (
+            "product_id",
             "product_name",
             "url",
             "price",
             "image_url",
             "brand",
+            "fitting_result",
         )
 
     # 중복 체크 커스텀 검증
@@ -82,4 +89,20 @@ class WishlistProductCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         return WishlistProduct.objects.create(
             user=self.context["request"].user, **validated_data
+        )
+        
+class WishlistProductListSerializer(serializers.ModelSerializer):
+    product_id = serializers.IntegerField(source="id", read_only=True)
+    fitting_result = FittingResultSerializer(read_only=True)
+
+    class Meta:
+        model = WishlistProduct
+        fields = (
+            "product_id",
+            "product_name",
+            "image_url",
+            "price",
+            "brand",
+            "url",
+            "fitting_result",
         )

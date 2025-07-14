@@ -2,17 +2,18 @@
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth import authenticate
 from rest_framework.views import APIView
+from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from django.conf import settings
-from .serializers import SignUpSerializer, LoginSerializer, LogoutSerializer, WishlistProductCreateSerializer
+from .serializers import SignUpSerializer, LoginSerializer, LogoutSerializer, WishlistProductCreateSerializer, WishlistProductListSerializer
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
-from .models import User
+from .models import User, WishlistProduct
 from django.conf import settings
 
 class SignUpAPI(generics.CreateAPIView):
@@ -164,4 +165,16 @@ class WishlistProductCreateView(APIView):
         return Response(
             {"message": "상품이 위시리스트에 추가되었습니다."},
             status=status.HTTP_201_CREATED,
+        )
+        
+class WishlistProductListView(ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = WishlistProductListSerializer
+
+    def get_queryset(self):
+        return (
+            WishlistProduct.objects
+            .filter(user=self.request.user, is_deleted=False)
+            .select_related("fitting_result")    # ← N+1 방지
+            .order_by("-created_at")
         )

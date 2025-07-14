@@ -28,6 +28,12 @@ class FittingResult(models.Model):
         null=False,
         blank=True,
     )
+    wishlist_product = models.OneToOneField(
+        "user.WishlistProduct",
+        on_delete=models.CASCADE,
+        related_name="fitting_result",
+        null=True, blank=True,
+    )
     fitting_photo_url = models.URLField(max_length=500)
     fitting_video_url = models.URLField(max_length=500, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
