@@ -1,30 +1,28 @@
 # user/views.py
-from django.contrib.auth.hashers import check_password, make_password
+from django.contrib.auth.hashers import check_password
 from django.contrib.auth import authenticate
 from rest_framework.views import APIView
-from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework import generics, permissions, status
+from rest_framework import generics, permissions, status, parsers
 from rest_framework.response import Response
 from django.conf import settings
-from .serializers import SignUpSerializer, LoginSerializer, LogoutSerializer, WishlistProductCreateSerializer, WishlistProductListSerializer
+from .serializers import SignUpSerializer, LoginSerializer, LogoutSerializer
 from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
-from .models import User, WishlistProduct
 from django.conf import settings
 
 class SignUpAPI(generics.CreateAPIView):
     serializer_class = SignUpSerializer
     permission_classes = [permissions.AllowAny]  
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser]
     
-    @swagger_auto_schema(operation_summary="회원가입")
+    @swagger_auto_schema(operation_summary="회원가입", consumes=["multipart/form-data"],)
     def post(self, request, *args, **kwargs):
         response = super().create(request, *args, **kwargs)
         response.data["message"] = "회원가입이 완료되었습니다."
-        return Response(response.data, status=status.HTTP_201_CREATED)
+        return response
 
 class LoginView(APIView):
     serializer_class = LoginSerializer
@@ -42,15 +40,10 @@ class LoginView(APIView):
         username = serializer.validated_data["username"]
         password = serializer.validated_data["password"]
 
-        try:
-            user = User.objects.get(username=username)
-        except User.DoesNotExist:
-            return Response({"error": "존재하지 않는 ID 입니다."},
-                            status=status.HTTP_404_NOT_FOUND)
-
-        if not check_password(password, user.password):
-            return Response({"error": "비밀번호가 틀렸습니다."},
-                            status=status.HTTP_401_UNAUTHORIZED)
+        user = authenticate(request, username=username, password=password)
+        
+        if user is None:
+            return Response({"error": "아이디 또는 비밀번호가 올바르지 않습니다."}, status=status.HTTP_401_UNAUTHORIZED)
 
         refresh = RefreshToken.for_user(user)
         data = {
@@ -140,41 +133,3 @@ class CookieTokenRefreshView(TokenRefreshView):
         )
         return resp
     
-    
-class WishlistProductCreateView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    @swagger_auto_schema(
-        operation_summary="위시리스트 저장",
-        request_body=WishlistProductCreateSerializer,
-        responses={
-            201: openapi.Response(
-                description="생성 성공",
-                examples={
-                    "application/json": {"message": "상품이 위시리스트에 추가되었습니다."}
-                },
-            ),
-            400: "잘못된 요청 또는 중복",
-            401: "로그인 필요",
-        },
-    )
-    def post(self, request):
-        serializer = WishlistProductCreateSerializer(data=request.data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(
-            {"message": "상품이 위시리스트에 추가되었습니다."},
-            status=status.HTTP_201_CREATED,
-        )
-        
-class WishlistProductListView(ListAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = WishlistProductListSerializer
-
-    def get_queryset(self):
-        return (
-            WishlistProduct.objects
-            .filter(user=self.request.user, is_deleted=False)
-            .select_related("fitting_result")    # ← N+1 방지
-            .order_by("-created_at")
-        )
