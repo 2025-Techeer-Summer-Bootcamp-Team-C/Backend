@@ -12,17 +12,36 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from django.conf import settings
+from .utils import upload_profile_image_to_s3
 
 class SignUpAPI(generics.CreateAPIView):
     serializer_class = SignUpSerializer
-    permission_classes = [permissions.AllowAny]  
+    permission_classes = [permissions.AllowAny]
     parser_classes = [parsers.MultiPartParser, parsers.FormParser]
-    
-    @swagger_auto_schema(operation_summary="회원가입", consumes=["multipart/form-data"],)
+
+    @swagger_auto_schema(
+        operation_summary="회원가입",
+        consumes=["multipart/form-data"],
+    )
     def post(self, request, *args, **kwargs):
-        response = super().create(request, *args, **kwargs)
-        response.data["message"] = "회원가입이 완료되었습니다."
-        return response
+        image_file = request.FILES.get("profile_image")
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save() 
+
+        if image_file:
+            image_bytes = image_file.read()
+            profile_image_url = upload_profile_image_to_s3(str(user.id), image_bytes)
+
+            user.profile_image = profile_image_url
+            user.save() 
+
+        return Response({
+            "message": "회원가입이 완료되었습니다.",
+            "user_id": user.id,
+            "profile_image_url": user.profile_image
+        }, status=201)
 
 class LoginView(APIView):
     serializer_class = LoginSerializer
