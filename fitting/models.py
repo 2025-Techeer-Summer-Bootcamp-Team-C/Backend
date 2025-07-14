@@ -20,28 +20,3 @@ class UserImage(models.Model):
     def __str__(self):
         return f"UserImage {self.id}"
 
-
-class FittingResult(models.Model):
-    user_image = models.ForeignKey(
-        UserImage,
-        on_delete=models.CASCADE,
-        null=False,
-        blank=True,
-    )
-    wishlist_product = models.OneToOneField(
-        "user.WishlistProduct",
-        on_delete=models.CASCADE,
-        related_name="fitting_result",
-        null=True, blank=True,
-    )
-    fitting_photo_url = models.URLField(max_length=500)
-    fitting_video_url = models.URLField(max_length=500, null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
-    deleted_at = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        db_table = 'fitting_result'
-
-    def __str__(self):
-        return f"FittingResult {self.id}"

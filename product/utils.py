@@ -27,3 +27,20 @@ def upload_product_image(product_id: int, image_bytes: bytes, ext: str = "jpg") 
         },
     )
     return f"{CLOUDFRONT_DOMAIN}/{key}"
+
+def upload_product_image(product_id: int, image_bytes: bytes, ext: str = "jpg") -> str:
+    """
+    상품 ID 하위로 이미지를 저장하고 CloudFront URL 반환
+    product_images/{product_id}/{uuid}.jpg
+    """
+    key = f"product_images/{product_id}/{uuid.uuid4()}.{ext}"
+    s3.upload_fileobj(
+        io.BytesIO(image_bytes),
+        BUCKET,
+        key,
+        ExtraArgs={
+            "ContentType": f"image/{ext}",
+            "ContentDisposition": "inline",
+        },
+    )
+    return f"{CLOUDFRONT_DOMAIN}/{key}"

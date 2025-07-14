@@ -16,7 +16,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from celery import chord
 from .tasks import run_vto_task, collect_paths, run_vto_url_task
 from .utils      import upload_bytes, upload_url
-from .models     import UserImage, FittingResult
+from .models     import UserImage
 
 load_dotenv()
 BITSTUDIO_API_KEY = os.getenv("BITSTUDIO_API_KEY")
