@@ -167,11 +167,11 @@ class VTOProductView(GenericAPIView):
         # 1) 입력 검증
         ser = self.get_serializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        d = ser.validated_data
+        data = ser.validated_data
 
-        person_url  = d["person_image_url"]
-        outfit_url  = d["outfit_image_url"]
-        category    = d["category"]        # 상의 / 하의 / 기타
+        person_url  = data["person_image_url"]
+        outfit_url  = data["outfit_image_url"]
+        category    = data["category"]        # 상의 / 하의 / 기타
 
         # 2) 카테고리에 따라 안내 문구(garment_clause) 결정
         if category == "상의":
