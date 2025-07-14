@@ -4,8 +4,9 @@ from rest_framework.generics import CreateAPIView
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from .models import Product
+from .models import Product, ProductImage
 from .serializers import ProductCreateSerializer
 from .utils import upload_product_image  # ✅ 수정된 함수 임포트
 
@@ -56,4 +57,51 @@ class ProductCreateView(CreateAPIView):
             "message": "상품이 성공적으로 등록되었습니다.",
             "product_id": product.id,
             "s3_image_url": s3_url
+        }, status=201)
+
+class ProductImageUploadView(APIView):
+    parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [AllowAny]
+
+    @swagger_auto_schema(
+        operation_summary="상품 이미지 다중 업로드",
+        operation_description="상품 ID에 해당하는 상품에 여러 장의 이미지를 업로드하고 DB에 저장합니다.",
+        manual_parameters=[
+            openapi.Parameter(
+                name='images',
+                in_=openapi.IN_FORM,
+                description='업로드할 이미지 파일들 (다중 업로드)',
+                type=openapi.TYPE_FILE,
+                required=True
+            )
+        ],
+        responses={201: "업로드 성공", 400: "잘못된 요청", 404: "상품 없음"},
+    )
+    def post(self, request, product_id):
+        product = Product.objects.filter(id=product_id).first()
+        if not product:
+            return Response({"error": "상품이 존재하지 않습니다."}, status=404)
+
+        files = request.FILES.getlist('images')
+        if not files:
+            return Response({"error": "업로드할 이미지가 없습니다."}, status=400)
+
+        uploaded_urls = []
+
+        for image_file in files:
+            image_bytes = image_file.read()
+            s3_url = upload_product_image(product.id, image_bytes)
+
+            # ✅ ProductImage DB 저장 (is_deleted=False로 명시)
+            ProductImage.objects.create(
+                product=product,
+                image=s3_url,
+                is_deleted=False  # 기본값 지정
+            )
+
+            uploaded_urls.append(s3_url)
+
+        return Response({
+            "product_id": product.id,
+            "uploaded_images": uploaded_urls
         }, status=201)
