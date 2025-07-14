@@ -27,6 +27,7 @@ urlpatterns = [
         path("fittings/", include('fitting.urls')),
         path("users/", include("user.urls")),  
         path('style/', include('style.urls')),
+        path('product/',include('product.urls')),
     ])),
 ]
 
