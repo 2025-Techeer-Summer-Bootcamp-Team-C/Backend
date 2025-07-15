@@ -14,9 +14,11 @@ from .serializers import GenerateVTORequestSerializer, VTORequestSerializer, Gen
 import requests
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from celery import chord
-from .tasks import run_vto_task, collect_paths, run_vto_url_task
+from .tasks import run_vto_task, collect_paths, run_vto_url_task, save_to_s3_and_db
 from .utils      import upload_bytes, upload_url
 from .models     import UserImage
+from celery import group, chain
+from product.models import Product
 
 load_dotenv()
 BITSTUDIO_API_KEY = os.getenv("BITSTUDIO_API_KEY")
@@ -347,3 +349,37 @@ class VTOTestView(GenericAPIView):
             return None
         except Exception:
             return None
+        
+class ProductFittingGenerateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        person_url = user.profile_image
+        if not person_url:
+            return Response({"error": "사용자 사진이 없습니다."}, status=400)
+
+        products = Product.objects.all()
+        if not products.exists():
+            return Response({"error": "상품이 없습니다."}, status=400)
+
+        prompt = "Generate a realistic, high-quality full-body image of the input person wearing the input clothing. The scene MUST be set in a bright, seamless white studio background (pure white, no props, no shadows on walls). Ensure the clothes fit naturally to the person’s body shape, while preserving the person’s facial features, skin tone, and hair."
+        # 상품별 태스크를 group으로 묶어 한꺼번에 예약
+        tasks = [
+            chain(
+                run_vto_url_task.s(person_url, product.image, prompt),   # ① VTO 생성
+                save_to_s3_and_db.s(user.id, product.id)         # ② S3+DB 저장
+            )
+            for product in products
+        ]
+
+        job = group(tasks).apply_async()   # 비동기 예약
+
+        return Response(
+            {
+                "message": "가상 피팅 작업이 병렬로 예약되었습니다.",
+                "task_group_id": job.id,
+                "total_products": products.count()
+            },
+            status=202
+        )
