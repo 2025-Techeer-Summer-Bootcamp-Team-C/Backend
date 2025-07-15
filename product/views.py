@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from .models import Product, ProductImage
 from .serializers import ProductCreateSerializer
 from .utils import upload_product_image  # ✅ 수정된 함수 임포트
+from fitting.models import FittingResult
 
 
 class ProductCreateView(CreateAPIView):
@@ -105,3 +106,52 @@ class ProductImageUploadView(APIView):
             "product_id": product.id,
             "uploaded_images": uploaded_urls
         }, status=201)
+        
+class ProductInfoListView(APIView):
+    permission_classes = [AllowAny]
+
+    @swagger_auto_schema(
+        operation_summary="상품 정보 리스트 (스위치 기반 대표 이미지 변경)",
+        operation_description="""
+        - show_fitting=false: product 테이블에서 대표 이미지 및 상세 설명 반환<br/>
+        - show_fitting=true: fitting_result 테이블의 이미지 및 상세 설명 반환
+        """,
+        manual_parameters=[
+            openapi.Parameter(
+                'show_fitting',
+                openapi.IN_QUERY,
+                description="true: 피팅 이미지, false: 상품 모델 이미지",
+                type=openapi.TYPE_BOOLEAN,
+                required=True
+            )
+        ]
+    )
+    def get(self, request):
+        show_fitting = request.GET.get('show_fitting', 'false').lower() == 'true'
+        result = []
+
+        if show_fitting:
+            # 피팅 결과 이미지 2개
+            fittings = FittingResult.objects.filter(is_deleted=False).select_related('product')[:2]
+            for fitting in fittings:
+                product = fitting.product
+                result.append({
+                    'product_id': product.id,
+                    'name': product.name,
+                    'price': product.price,
+                    'image': fitting.image if fitting.image else product.image,
+                    'content': product.content
+                })
+        else:
+            # 상품(models.Product) 이미지 2개
+            products = Product.objects.filter(is_deleted=False)[:2]
+            for product in products:
+                result.append({
+                    'product_id': product.id,
+                    'name': product.name,
+                    'price': product.price,
+                    'image': product.image,
+                    'content': product.content
+                })
+
+        return Response({'products': result}, status=200)
