@@ -1,7 +1,7 @@
 from django.contrib.auth import authenticate
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import User
+from .models import User, CartItem
 
 class SignUpSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(write_only=True)
@@ -58,3 +58,9 @@ class LogoutSerializer(serializers.Serializer):
         # 블랙리스트 테이블에 저장 → 더 이상 재사용 불가
         self.token.blacklist()
         
+class CartItemSerializer(serializers.ModelSerializer):
+    product_id = serializers.IntegerField(source='product.id')
+
+    class Meta:
+        model = CartItem
+        fields = ['product_id', 'quantity']
