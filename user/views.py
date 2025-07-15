@@ -6,7 +6,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import generics, permissions, status, parsers
 from rest_framework.response import Response
 from django.conf import settings
-from .serializers import SignUpSerializer, LoginSerializer, LogoutSerializer, CartItemSerializer
+from .serializers import SignUpSerializer, LoginSerializer, LogoutSerializer, CartItemCreateSerializer, CartItemSerializer
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -159,13 +159,16 @@ class CartItemCreateAPIView(APIView):
 
     @swagger_auto_schema(
         operation_summary="장바구니에 상품 추가",
-        request_body=CartItemSerializer,
+        request_body=CartItemCreateSerializer,
         responses={201: CartItemSerializer, 400: "잘못된 요청"}
     )
     def post(self, request):
+        serializer = CartItemCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
         user = request.user
-        product_id = request.data.get('product_id')
-        quantity = request.data.get('quantity', 1)
+        product_id = serializer.validated_data['product_id']
+        quantity = serializer.validated_data['quantity']
 
         try:
             product = Product.objects.get(pk=product_id)
@@ -174,8 +177,25 @@ class CartItemCreateAPIView(APIView):
 
         cart_item, created = CartItem.objects.get_or_create(user=user, product=product)
         if not created:
-            cart_item.quantity += int(quantity)
-            cart_item.save()
+            cart_item.quantity += quantity
+        else:
+            cart_item.quantity = quantity
+        cart_item.save()
 
-        serializer = CartItemSerializer(cart_item)
-        return Response(serializer.data, status=201)
+        response_serializer = CartItemSerializer(cart_item)
+        return Response(response_serializer.data, status=201)
+    
+class CartItemListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    @swagger_auto_schema(operation_summary="장바구니 리스트") 
+    def get(self, request):
+        cart_items = CartItem.objects.filter(user=request.user)
+        serializer = CartItemSerializer(cart_items, many=True)
+
+        total_price = sum(item.product.price * item.quantity for item in cart_items)
+
+        return Response({
+            "cart_product": serializer.data,
+            "total_price": total_price
+        })
