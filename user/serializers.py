@@ -5,7 +5,7 @@ from .models import User
 
 class SignUpSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(write_only=True)
-    profile_image = serializers.CharField(read_only=True)
+    profile_image = serializers.ImageField(required=False)
 
     class Meta:
         model = User
@@ -21,6 +21,7 @@ class SignUpSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop("password2")
+        validated_data.pop("profile_image", None)
         password = validated_data.pop("password")
         user = User.objects.create_user(password=password, **validated_data)
         return user
