@@ -17,7 +17,6 @@ services:
     build:
       context: .
     volumes:
-      - .:/Backend
       - static_volume:/Backend/static
     ports:
       - "8000:8000"
