@@ -26,8 +26,6 @@ class SignUpSerializer(serializers.ModelSerializer):
         user = User.objects.create_user(password=password, **validated_data)
         return user
 
-
-    
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
@@ -59,8 +57,16 @@ class LogoutSerializer(serializers.Serializer):
         self.token.blacklist()
         
 class CartItemSerializer(serializers.ModelSerializer):
+    cart_product_id = serializers.IntegerField(source='id')
     product_id = serializers.IntegerField(source='product.id')
+    name = serializers.CharField(source='product.name')
+    price = serializers.IntegerField(source='product.price')
+    image = serializers.CharField(source='product.image')  # CharField 사용
 
     class Meta:
         model = CartItem
-        fields = ['product_id', 'quantity']
+        fields = ['cart_product_id', 'product_id', 'name', 'price', 'quantity', 'image']
+        
+class CartItemCreateSerializer(serializers.Serializer):
+    product_id = serializers.IntegerField()
+    quantity = serializers.IntegerField(min_value=1)
