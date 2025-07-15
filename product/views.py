@@ -155,3 +155,51 @@ class ProductInfoListView(APIView):
                 })
 
         return Response({'products': result}, status=200)
+    
+class ProductDetailView(APIView):
+    permission_classes = [AllowAny]
+
+    @swagger_auto_schema(
+        operation_summary="상품 상세 정보 (product_image 이미지 전체 포함)",
+        manual_parameters=[
+            openapi.Parameter(
+                'show_fitting', openapi.IN_QUERY,
+                description="true: 피팅 이미지(fitting_result), false: 모델 이미지(product.image)",
+                type=openapi.TYPE_BOOLEAN, required=True
+            )
+        ]
+    )
+    def get(self, request, product_id):
+        show_fitting = request.GET.get('show_fitting', 'false').lower() == 'true'
+        try:
+            product = Product.objects.select_related('category').get(pk=product_id)
+        except Product.DoesNotExist:
+            return Response({'error': '상품이 존재하지 않습니다.'}, status=404)
+
+        # 대표 이미지 분기
+        if show_fitting:
+            fitting_result = getattr(product, 'fitting_result', None)
+            if fitting_result and (fitting_result.is_deleted is False or fitting_result.is_deleted is None) and fitting_result.image:
+                model_image = fitting_result.image
+            else:
+                model_image = product.image
+        else:
+            model_image = product.image
+
+        # 모든 상품 이미지(product_image) 리스트 생성
+        # is_deleted가 null 또는 0인(즉, 삭제 안 된) 이미지만 반환
+        product_images = list(
+          ProductImage.objects.filter(product=product, is_deleted=0)
+         .values_list('image', flat=True)
+        )
+
+        response_data = {
+            "product_id": product.id,
+            "name": product.name,
+            "content": product.content,
+            "price": product.price,
+            "count": product.count,
+            "model_image": model_image,
+            "product_images": product_images,  # <-- 모든 이미지 리스트
+        }
+        return Response(response_data, status=200)
