@@ -34,3 +34,26 @@ def upload_url(prefix: str, remote_url: str) -> str:
         ext = "jpg"
 
     return upload_bytes(prefix, resp.content, ext)
+
+def upload_fitting_image_to_s3(
+    user_id: int,
+    product_id: int,
+    image_data: bytes,
+    variation: int | None = None,
+    ext: str = "jpg",
+) -> str:
+    """
+    fitting_images/{user_id}/{product_id}[_{variation}].jpg 형식으로 저장
+    """
+    if variation is None:
+        key = f"fitting_images/{user_id}/{product_id}.{ext}"
+    else:
+        key = f"fitting_images/{user_id}/{product_id}_{variation}.{ext}"
+
+    s3.upload_fileobj(
+        io.BytesIO(image_data),
+        BUCKET,
+        key,
+        ExtraArgs={"ContentType": f"image/{ext}", "ContentDisposition": "inline"},
+    )
+    return f"{CLOUDFRONT_DOMAIN}/{key}"
