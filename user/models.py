@@ -27,6 +27,7 @@ class CartItem(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
+    is_fitting = models.BooleanField(default=False, verbose_name="합성 여부")
 
     class Meta:
         unique_together = ('user', 'product')

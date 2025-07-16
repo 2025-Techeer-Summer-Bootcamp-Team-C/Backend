@@ -5,9 +5,11 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import generics, permissions, status, parsers
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
 from django.conf import settings
 from .serializers import SignUpSerializer, LoginSerializer, LogoutSerializer, CartItemCreateSerializer, CartItemSerializer, CartItemUpdateSerializer
 from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
@@ -239,3 +241,54 @@ class CartItemUpdateAPIView(APIView):
             return Response({"message": "상품이 장바구니에서 삭제되었습니다."}, status=200)
         except CartItem.DoesNotExist:
             return Response({"error": "장바구니에서 해당 상품을 찾을 수 없습니다."}, status=404)
+        
+        
+class UpdateProfileImageAPI(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    @swagger_auto_schema(
+        operation_summary="프로필 이미지 변경",
+        operation_description="새로운 프로필 이미지를 업로드하여 변경합니다.",
+        consumes=["multipart/form-data"],
+        manual_parameters=[
+            openapi.Parameter(
+                name="profile_image",
+                in_=openapi.IN_FORM,
+                type=openapi.TYPE_FILE,
+                required=True,
+                description="새 프로필 이미지 파일",
+            )
+        ],
+        responses={
+            200: openapi.Response(
+                description="성공적으로 변경됨",
+                examples={
+                    "application/json": {
+                        "message": "프로필 이미지가 성공적으로 변경되었습니다.",
+                        "profile_image_url": "https://cdn.example.com/profiles/1/abcd.jpg"
+                    }
+                }
+            ),
+            400: "이미지가 포함되지 않았을 때",
+        }
+    )
+    def patch(self, request):
+        image_file = request.FILES.get("profile_image")
+        if not image_file:
+            return Response({"error": "이미지 파일을 제공해주세요."}, status=status.HTTP_400_BAD_REQUEST)
+
+        image_bytes = image_file.read()
+        ext = image_file.name.split('.')[-1].lower()
+
+        user = request.user
+        profile_image_url = upload_profile_image_to_s3(str(user.id), image_bytes, ext)
+
+        user.profile_image = profile_image_url
+        CartItem.objects.filter(user=user).update(is_fitting=False)
+        user.save()
+
+        return Response({
+            "message": "프로필 이미지가 성공적으로 변경되었습니다.",
+            "profile_image_url": user.profile_image
+        }, status=status.HTTP_200_OK)
