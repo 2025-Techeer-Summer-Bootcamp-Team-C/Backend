@@ -57,3 +57,16 @@ def upload_fitting_image_to_s3(
         ExtraArgs={"ContentType": f"image/{ext}", "ContentDisposition": "inline"},
     )
     return f"{CLOUDFRONT_DOMAIN}/{key}"
+
+def upload_bytes(prefix: str, data: bytes, ext: str = "jpg") -> str:
+    key = f"{prefix}{uuid.uuid4()}.{ext}"
+    s3.upload_fileobj(
+        io.BytesIO(data),
+        BUCKET,
+        key,
+        ExtraArgs={
+            "ContentType": f"{'video' if ext=='mp4' else 'image'}/{ext}",
+            "ContentDisposition": "inline",
+        },
+    )
+    return f"{CLOUDFRONT_DOMAIN}/{key}"

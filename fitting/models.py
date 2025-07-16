@@ -33,6 +33,12 @@ class FittingResult(models.Model):
         related_name='fitting_results',
         verbose_name="상품 아이디"
         )
+    status = models.CharField(
+        max_length=20,
+        choices=[('pending', '대기중'), ('processing', '처리중'), ('completed', '완료'), ('failed', '실패')],
+        default='pending',
+        verbose_name="영상 생성 상태"
+    )
     image = models.CharField(max_length=255, null=True, blank=True, verbose_name="피팅사진 주소")
     video = models.CharField(max_length=255, null=True, blank=True, verbose_name="피팅영상")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="생성일시")
