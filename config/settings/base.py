@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'storages',
     'fitting',
     'product',
+    'category'
 ]
 
 MIDDLEWARE = [
