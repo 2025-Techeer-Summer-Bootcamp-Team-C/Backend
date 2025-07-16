@@ -27,10 +27,10 @@ class FittingResult(models.Model):
         related_name='fitting_results',
         verbose_name="사용자 아이디"
         )
-    product = models.OneToOneField(
+    product = models.ForeignKey(
         'product.Product',
         on_delete=models.CASCADE,
-        related_name='fitting_result',
+        related_name='fitting_results',
         verbose_name="상품 아이디"
         )
     image = models.CharField(max_length=255, null=True, blank=True, verbose_name="피팅사진 주소")
@@ -41,6 +41,9 @@ class FittingResult(models.Model):
 
     class Meta:
         db_table = 'fitting_result'
+        unique_together = [
+            ('user', 'product'),
+            ]
 
     def __str__(self):
         return f"FittingResult {self.id} - User {self.user_id} - Product {self.product_id}"

@@ -21,3 +21,16 @@ class GenerateVTOProductRequestSerializer(serializers.Serializer):
 class VTOTestRequestSerializer(serializers.Serializer):
     person_image = serializers.ImageField()
     outfit_image = serializers.ImageField()
+
+class ChangeBgSerializer(serializers.Serializer):
+    image     = serializers.CharField(required=False)     # URL
+    image_file = serializers.ImageField(required=False)   # 업로드 파일
+    replace   = serializers.CharField(default="white studio")
+    negative  = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, data):
+        if not (data.get("image") or data.get("image_file")):
+            raise serializers.ValidationError("image 또는 image_file 중 하나는 필수입니다.")
+        # 하나만 남기도록 정리
+        data["image"] = data.pop("image_file", data.get("image"))
+        return data

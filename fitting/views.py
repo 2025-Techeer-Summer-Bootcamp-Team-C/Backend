@@ -10,15 +10,16 @@ from django.conf import settings
 from openai import OpenAI
 from rest_framework.parsers import MultiPartParser, FormParser
 import base64
-from .serializers import GenerateVTORequestSerializer, VTORequestSerializer, GenerateVTOProductRequestSerializer, VTOTestRequestSerializer
+from .serializers import GenerateVTORequestSerializer, VTORequestSerializer, GenerateVTOProductRequestSerializer, VTOTestRequestSerializer, ChangeBgSerializer
 import requests
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from celery import chord
-from .tasks import run_vto_task, collect_paths, run_vto_url_task, save_to_s3_and_db
+from .tasks import run_vto_task, collect_paths, run_vto_url_task, save_to_s3_and_db, run_vto_edit_url_task, edit_bg_task
 from .utils      import upload_bytes, upload_url
 from .models     import UserImage
 from celery import group, chain
 from product.models import Product
+from django.core.files.uploadedfile import UploadedFile
 
 load_dotenv()
 BITSTUDIO_API_KEY = os.getenv("BITSTUDIO_API_KEY")
@@ -363,11 +364,260 @@ class ProductFittingGenerateView(APIView):
         if not products.exists():
             return Response({"error": "상품이 없습니다."}, status=400)
 
-        prompt = "Generate a realistic, high-quality full-body image of the input person wearing the input clothing. The scene MUST be set in a bright, seamless white studio background (pure white, no props, no shadows on walls). Ensure the clothes fit naturally to the person’s body shape, while preserving the person’s facial features, skin tone, and hair."
+        prompt = "Using the outfit image as the pose, lighting, and background reference, replace the model with the input person so that the person now wears the same clothes in the exact pose and setting. Preserve the model photo’s camera angle, framing, and white-studio background, but swap in the input person’s face, skin tone, hair, and body proportions. Ensure the clothes fit naturally to the new body and the overall result looks realistic and high-quality."
         # 상품별 태스크를 group으로 묶어 한꺼번에 예약
         tasks = [
             chain(
                 run_vto_url_task.s(person_url, product.image, prompt),   # ① VTO 생성
+                save_to_s3_and_db.s(user.id, product.id)         # ② S3+DB 저장
+            )
+            for product in products
+        ]
+
+        job = group(tasks).apply_async()   # 비동기 예약
+
+        return Response(
+            {
+                "message": "가상 피팅 작업이 병렬로 예약되었습니다.",
+                "task_group_id": job.id,
+                "total_products": products.count()
+            },
+            status=202
+        )
+        
+TNB_BG_API   = "https://thenewblack.ai/api/1.1/wf/change-background"
+TNB_EMAIL    = os.getenv("TNB_EMAIL")      # The New Black 계정
+TNB_PASSWORD = os.getenv("TNB_PASSWORD")
+
+class RemoveBgView(APIView):
+    """
+    The New Black AI 'change-background' 테스트 프록시
+    배경을 흰색 스튜디오로 교체하고 TNB가 돌려준 응답 그대로 반환
+    """
+    permission_classes = [AllowAny]          # 공개 테스트용
+    parser_classes     = (MultiPartParser, FormParser)   # 파일·URL 둘 다 수용
+
+    # ───────────────────────── Swagger ──────────────────────────
+    @swagger_auto_schema(
+        operation_summary="TNB 배경 교체(흰색 스튜디오) 테스트",
+        request_body=ChangeBgSerializer,
+        responses={200: openapi.Response("TNB 원본 응답(JSON 또는 텍스트)")},
+    )
+    def post(self, request):
+        # 1) 입력 검증
+        ser = ChangeBgSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        d = ser.validated_data
+
+        # 2) multipart 인자 구성
+        files = {
+            "email":    (None, TNB_EMAIL or request.data.get("email")),
+            "password": (None, TNB_PASSWORD or request.data.get("password")),
+            "image":    self._as_file_tuple(d["image"]),       # 핵심
+            "replace":  (None, "pure white seamless studio backdrop, no objects"), 
+        }
+        if d.get("negative"):
+            files["negative"] = (None, d["negative"])
+
+        # 3) TNB 호출
+        try:
+            resp = requests.post(TNB_BG_API, files=files, timeout=90)
+        except requests.RequestException as exc:
+            return Response(
+                {"error": f"TNB 요청 실패: {exc}"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        # 4) 원본 응답을 그대로 전달 (JSON/텍스트 자동 구분)
+        body = self._safe_body(resp)
+        return Response(body, status=resp.status_code)
+
+    # ──────────────── helpers ──────────────────────────────────
+    @staticmethod
+    def _as_file_tuple(value):
+        """
+        value 가
+        ▸ UploadedFile  → ("filename", file_obj)
+        ▸ str(URL)      → (None, url_string)
+        로 변환해 multipart form에 넣는다.
+        """
+        if isinstance(value, UploadedFile):
+            return (value.name, value)
+        return (None, value)
+
+    @staticmethod
+    def _safe_body(resp):
+        """
+        JSON이면 파싱, 아니면 텍스트 그대로 반환.
+        "raw" 키에 본문을 담아줌.
+        """
+        content_type = resp.headers.get("Content-Type", "")
+        if "application/json" in content_type:
+            try:
+                return resp.json()
+            except ValueError:
+                return {"raw": resp.text, "note": "JSON 파싱 실패"}
+        return {"raw": resp.text}
+    
+    
+import logging
+logger = logging.getLogger(__name__)
+class EditBgWhiteView(APIView):
+    """
+    BitStudio Edit Image API를 사용해
+    image_id로 지정한 원본 이미지의 **배경을 흰색**으로 바꿉니다.
+    """
+    permission_classes = [AllowAny]
+    parser_classes     = [parsers.JSONParser, parsers.FormParser]
+
+    # -------- 수정 파라미터 --------
+    PROMPT      = "Replace the background with a soft light-gray studio backdrop (#e8e8e8) and add a subtle floor shadow under the model for realism"
+    RESOLUTION  = "standard"
+    NUM_IMAGES  = 1
+    SEED        = 4
+
+    # -------- 폴링 설정 --------
+    POLL_INTERVAL = 5   # 초
+    MAX_POLLS     = 36
+
+    # -------- Swagger 스키마 --------
+    @swagger_auto_schema(
+        operation_summary="이미지 배경을 흰색으로 편집",
+        operation_description="""
+BitStudio **Edit Image API**를 호출해 `image_id`에 해당하는 이미지를
+plain white 배경으로 변경합니다.
+
+- 200 OK  : 편집 완료, 최종 URL 반환  
+- 202     : 30초 내 완료되지 않음(계속 폴링 필요)  
+- 400/500 : 요청 실패
+""",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["image_id"],
+            properties={
+                "image_id": openapi.Schema(type=openapi.TYPE_STRING),
+            },
+            example={"image_id": "IMG_123"}
+        ),
+        responses={
+            200: openapi.Response(description="편집 완료"),
+            202: openapi.Response(description="편집 진행 중(타임아웃)"),
+            400: openapi.Response(description="BitStudio 요청 실패"),
+        },
+    )
+    # --------------------------------
+    def post(self, request):
+        image_id = request.data.get("image_id")
+        if not image_id:
+            return Response(
+                {"detail": "image_id 파라미터가 필요합니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 1) 편집 요청
+        try:
+            edit_resp = requests.post(
+                f"https://api.bitstudio.ai/images/{image_id}/edit",
+                headers={
+                    "Authorization": f"Bearer {BITSTUDIO_API_KEY}",
+                    "Content-Type":  "application/json",
+                },
+                json={
+                    "prompt":     self.PROMPT,
+                    "resolution": self.RESOLUTION,
+                    "num_images": self.NUM_IMAGES,
+                    "seed":       self.SEED,
+                },
+                timeout=60,
+            )
+        except requests.RequestException as exc:
+            logger.exception("BitStudio 편집 요청 네트워크 오류")
+            return Response(
+                {"detail": "BitStudio 편집 요청 중 네트워크 오류", "error": str(exc)},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        # 2xx 이외 → 실패로 간주
+        if not edit_resp.ok:
+            return Response(
+                {"detail": "BitStudio 편집 요청 실패", "bitstudio_response": edit_resp.text},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        edit_data = edit_resp.json()
+        logger.debug("BitStudio edit 응답: %s", edit_data)
+
+        # 2) 새로 만들어진 edited 버전 찾기
+        edit_versions = [
+            v for v in edit_data.get("versions", [])
+            if v.get("version_type") in ("edit", "edited")
+        ]
+        if not edit_versions:
+            return Response(
+                {"detail": "versions 배열에 edit/edited 항목이 없습니다.",
+                 "bitstudio_response": edit_data},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        edit_version = edit_versions[0]
+        target_id = edit_version["source_image_id"]
+
+        print(target_id)
+        # 3) 편집 완료까지 폴링
+        for _ in range(self.MAX_POLLS):
+            status_resp = requests.get(
+                f"https://api.bitstudio.ai/images/{target_id}",
+                headers={"Authorization": f"Bearer {BITSTUDIO_API_KEY}"},
+                timeout=30,
+            ).json()
+
+            logger.debug("폴링 결과: %s", status_resp)
+
+            if status_resp.get("status") == "completed":
+                return Response(
+                    {
+                        "detail": "편집 완료",
+                        "image":  status_resp.get("path"),
+                        "meta":   status_resp,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+            if status_resp.get("status") == "failed":
+                return Response(
+                    {"detail": "BitStudio 편집 실패", "meta": status_resp},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            time.sleep(self.POLL_INTERVAL)
+
+        # 4) 타임아웃
+        return Response(
+            {
+                "detail": f"{self.MAX_POLLS * self.POLL_INTERVAL}초 내에 편집이 완료되지 않았습니다.",
+                "meta": edit_data,
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
+        
+class ProductFittingGenerateDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        person_url = user.profile_image
+        if not person_url:
+            return Response({"error": "사용자 사진이 없습니다."}, status=400)
+
+        products = Product.objects.all()
+        if not products.exists():
+            return Response({"error": "상품이 없습니다."}, status=400)
+
+        prompt = "Using the outfit image as the pose, lighting, and background reference, replace the model with the input person so that the person now wears the same clothes in the exact pose and setting. Preserve the model photo’s camera angle, framing, and white-studio background, but swap in the input person’s face, skin tone, hair, and body proportions. Ensure the clothes fit naturally to the new body and the overall result looks realistic and high-quality."
+        # 상품별 태스크를 group으로 묶어 한꺼번에 예약
+        tasks = [
+            chain(
+                run_vto_edit_url_task.s(person_url, product.image, prompt),   # ① VTO 생성
+                edit_bg_task.s(),
                 save_to_s3_and_db.s(user.id, product.id)         # ② S3+DB 저장
             )
             for product in products

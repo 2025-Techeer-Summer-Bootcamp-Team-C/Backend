@@ -127,6 +127,7 @@ def save_to_s3_and_db(self, vto_url: str, user_id: int, product_id: int):
         product = Product.objects.get(id=product_id)
 
         FittingResult.objects.update_or_create(
+            user = user,
             product=product,                # 1:1 관계 기준
             defaults={
                 "user":  user,
@@ -138,3 +139,80 @@ def save_to_s3_and_db(self, vto_url: str, user_id: int, product_id: int):
     except (requests.RequestException, ObjectDoesNotExist) as exc:
         # 네트워크 오류나 객체 미존재 시 재시도
         raise self.retry(exc=exc)
+    
+@shared_task(bind=True, max_retries=3, default_retry_delay=5)
+def run_vto_edit_url_task(self, person_url, outfit_url, prompt):
+    """
+    Bitstudio에 URL만 넘겨 VTO 1장을 생성
+    → 완료된 **이미지 ID** (job_id) 반환, 실패/타임아웃 시 None
+    """
+    try:
+        # ① 작업 시작
+        r = requests.post(
+            "https://api.bitstudio.ai/images/virtual-try-on",
+            headers={"Authorization": f"Bearer {BITSTUDIO_API_KEY}",
+                     "Content-Type": "application/json"},
+            json={
+                "person_image_url":  person_url,
+                "outfit_image_url":  outfit_url,
+                "prompt":            prompt,
+                "resolution":        "standard",
+                "num_images":        1,
+                "style":             "studio",
+            },
+            timeout=60,
+        )
+        r.raise_for_status()
+        vto_image_id = r.json()[0]["id"]          # ← 결과 이미지 ID
+
+        # ② 완료 폴링 (2초 × 30 = 60초)
+        for _ in range(30):
+            info = requests.get(
+                f"https://api.bitstudio.ai/images/{vto_image_id}",
+                headers={"Authorization": f"Bearer {BITSTUDIO_API_KEY}"},
+                timeout=10,
+            ).json()
+
+            if info.get("status") == "completed" and info.get("path"):
+                return vto_image_id              # ✅ 이미지 ID 반환
+            if info.get("status") == "failed":
+                return None
+            time.sleep(2)
+
+        return None  # 타임아웃
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=5)
+def edit_bg_task(self, vto_image_id):
+    # 1) Edit 요청
+    r = requests.post(
+        f"https://api.bitstudio.ai/images/{vto_image_id}/edit",
+        headers={"Authorization": f"Bearer {BITSTUDIO_API_KEY}",
+                 "Content-Type":  "application/json"},
+        json={
+            "prompt":      "Replace the background with a soft light-gray studio backdrop (#e8e8e8) and add a subtle floor shadow under the model for realism",
+            "resolution":  "standard",
+            "num_images":  1,
+            "seed":        42
+        },
+        timeout=60,
+    ).json()
+
+    ver = r["versions"][0]
+    result_id = ver.get("source_image_id") or ver["id"]
+    poll_url  = (
+        f"https://api.bitstudio.ai/images/{result_id}"
+        if ver.get("source_image_id") else
+        f"https://api.bitstudio.ai/images/versions/{result_id}"
+    )
+
+    # 2) 폴링 (5 s × 36 = 3분)
+    for _ in range(36):
+        info = requests.get(poll_url, headers={"Authorization": f"Bearer {BITSTUDIO_API_KEY}"}, timeout=15).json()
+        if info["status"] == "completed" and info.get("path"):
+            return info["path"]          # ✅ 편집된 이미지 URL 반환
+        if info["status"] == "failed":
+            return None
+        time.sleep(5)
+    return None
