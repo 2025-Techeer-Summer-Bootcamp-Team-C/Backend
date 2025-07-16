@@ -77,7 +77,7 @@ class LoginView(APIView):
         resp = Response(data, status=status.HTTP_200_OK)
         resp.set_cookie("access",  data["access_token"],
                         httponly=True, samesite="Lax",
-                        secure=not settings.DEBUG, path="/", max_age=60*15)
+                        secure=not settings.DEBUG, path="/", max_age=60*60)
         resp.set_cookie("refresh", data["refresh_token"],
                         httponly=True, samesite="Lax",
                         secure=not settings.DEBUG, path="/", max_age=60*60*24*7)

@@ -218,9 +218,8 @@ def edit_bg_task(self, vto_image_id):
     return None
 
 @shared_task
-def generate_fitting_video_task(fitting_id):
+def generate_fitting_video_task(fitting_id, task_id):
     fitting = FittingResult.objects.get(pk=fitting_id)
-    ext_id = fitting.external_id
     video_url = None
 
     # 최대 8분 5초마다 폴링
@@ -229,14 +228,14 @@ def generate_fitting_video_task(fitting_id):
         resp = requests.post(
             "https://thenewblack.ai/api/1.1/wf/results_video",
             files={
-                'email':    (None, settings.SECRET_EMAIL),
-                'password': (None, settings.SECRET_PASSWORD),
-                'id':       (None, ext_id),
+                'email':    (None, os.getenv("TNB_EMAIL")),
+                'password': (None, os.getenv("TNB_PASSWORD")),
+                'id':       (None, task_id),
             }
         )
         if resp.status_code != 200:
             continue
-        detail = resp.json().get('detail')
+        detail = resp.text.strip()
         if detail and detail.startswith("http"):
             video_url = detail
             break

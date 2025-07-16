@@ -667,22 +667,62 @@ class ProductFittingVideoGenerateView(APIView):
             files={
                 'email':    (None, os.getenv("TNB_EMAIL")),
                 'password': (None, os.getenv("TNB_PASSWORD")),
-                'image':    (None, request.user.profile_image),
+                'image':    (None, fitting.image),
                 'prompt':   (None, "A full‑body shot of a professional fashion model gracefully alternating between left and right poses on a minimalist studio background, with soft directional lighting highlighting the contours of the clothing, high resolution, ultra‑realistic detail, while preserving the model’s facial features and the precise fit of the clothing."),
             }
         )
         if resp.status_code != 200:
             return Response({"detail": resp.text}, status=resp.status_code)
 
-        ext_id = resp.json().get('detail')
-        fitting.external_id = ext_id
+        task_id = resp.text.strip()
+        if not task_id:
+            return Response(
+                {"detail": "외부 작업 ID를 받을 수 없습니다. 응답: " + resp.text},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
         fitting.status = 'processing'
-        fitting.save(update_fields=['external_id', 'status'])
+        fitting.save(update_fields=['status'])
 
         # Celery 태스크 비동기로 호출
-        generate_fitting_video_task.delay(fitting.id)
+        generate_fitting_video_task.delay(fitting.id, task_id)
 
         return Response(
             {"detail": "영상 생성 요청을 받았습니다. 잠시 후 상태를 확인하세요."},
             status=status.HTTP_202_ACCEPTED
         )
+        
+class ProductFittingVideoStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        request_body=None,
+        manual_parameters=[
+            openapi.Parameter(
+                'product_id', openapi.IN_PATH,
+                description="피팅 대상 상품 ID",
+                type=openapi.TYPE_INTEGER,
+                required=True
+            ),
+        ],
+        responses={200: openapi.Response(
+            '현재 상태 및 비디오 URL',
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status':    openapi.Schema(type=openapi.TYPE_STRING, description='pending|processing|completed|failed'),
+                    'video_url': openapi.Schema(type=openapi.TYPE_STRING, description='완료 시 S3 비디오 URL, 그 외 null'),
+                }
+            )
+        )}
+    )
+    def get(self, request, product_id):
+        # 1) 레코드 존재 확인
+        product = get_object_or_404(Product, pk=product_id)
+        fitting = get_object_or_404(FittingResult, user=request.user, product=product)
+
+        # 2) 응답
+        return Response({
+            'status':    fitting.status,
+            'video_url': fitting.video if fitting.status == 'completed' else None
+        }, status=status.HTTP_200_OK)
