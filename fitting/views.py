@@ -14,12 +14,14 @@ from .serializers import GenerateVTORequestSerializer, VTORequestSerializer, Gen
 import requests
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from celery import chord
-from .tasks import run_vto_task, collect_paths, run_vto_url_task, save_to_s3_and_db, run_vto_edit_url_task, edit_bg_task
+from .tasks import run_vto_task, collect_paths, run_vto_url_task, save_to_s3_and_db, run_vto_edit_url_task, edit_bg_task, generate_fitting_video_task
 from .utils      import upload_bytes, upload_url
 from .models     import UserImage
 from celery import group, chain
 from product.models import Product
 from django.core.files.uploadedfile import UploadedFile
+from django.shortcuts import get_object_or_404
+from .models import FittingResult
 
 load_dotenv()
 BITSTUDIO_API_KEY = os.getenv("BITSTUDIO_API_KEY")
@@ -632,4 +634,55 @@ class ProductFittingGenerateDetailView(APIView):
                 "total_products": products.count()
             },
             status=202
+        )
+        
+class ProductFittingVideoGenerateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, product_id):
+        product = get_object_or_404(Product, pk=product_id)
+        fitting = get_object_or_404(
+            FittingResult,
+            user=request.user,
+            product=product
+        )
+        
+        if fitting.status == 'processing':
+            return Response(
+                {"detail": "이미 영상 생성 요청이 진행 중입니다."},
+                status=status.HTTP_202_ACCEPTED
+            )
+        if fitting.status == 'completed' and fitting.video:
+            return Response(
+                {
+                    "detail": "이미 영상이 생성되어 있습니다.",
+                    "video_url": fitting.video
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 외부 API에 작업 요청만 보내고 external_id 만 저장
+        resp = requests.post(
+            "https://thenewblack.ai/api/1.1/wf/ai-video",
+            files={
+                'email':    (None, os.getenv("TNB_EMAIL")),
+                'password': (None, os.getenv("TNB_PASSWORD")),
+                'image':    (None, request.user.profile_image),
+                'prompt':   (None, "A full‑body shot of a professional fashion model gracefully alternating between left and right poses on a minimalist studio background, with soft directional lighting highlighting the contours of the clothing, high resolution, ultra‑realistic detail, while preserving the model’s facial features and the precise fit of the clothing."),
+            }
+        )
+        if resp.status_code != 200:
+            return Response({"detail": resp.text}, status=resp.status_code)
+
+        ext_id = resp.json().get('detail')
+        fitting.external_id = ext_id
+        fitting.status = 'processing'
+        fitting.save(update_fields=['external_id', 'status'])
+
+        # Celery 태스크 비동기로 호출
+        generate_fitting_video_task.delay(fitting.id)
+
+        return Response(
+            {"detail": "영상 생성 요청을 받았습니다. 잠시 후 상태를 확인하세요."},
+            status=status.HTTP_202_ACCEPTED
         )
