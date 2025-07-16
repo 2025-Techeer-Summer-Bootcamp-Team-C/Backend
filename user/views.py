@@ -6,7 +6,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import generics, permissions, status, parsers
 from rest_framework.response import Response
 from django.conf import settings
-from .serializers import SignUpSerializer, LoginSerializer, LogoutSerializer, CartItemCreateSerializer, CartItemSerializer
+from .serializers import SignUpSerializer, LoginSerializer, LogoutSerializer, CartItemCreateSerializer, CartItemSerializer, CartItemUpdateSerializer
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -199,3 +199,43 @@ class CartItemListAPIView(APIView):
             "cart_product": serializer.data,
             "total_price": total_price
         })
+        
+class CartItemUpdateAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="장바구니 상품 수량 수정",
+        request_body=CartItemUpdateSerializer,
+        responses={200: CartItemSerializer, 404: "상품을 찾을 수 없음"}
+    )
+    def put(self, request, cart_product_id):
+        try:
+            cart_item = CartItem.objects.get(id=cart_product_id, user=request.user)
+        except CartItem.DoesNotExist:
+            return Response({"error": "장바구니에서 해당 상품을 찾을 수 없습니다."}, status=404)
+
+        serializer = CartItemUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        quantity = serializer.validated_data['quantity']
+        
+        if quantity <= 0:
+            cart_item.delete()
+            return Response({"message": "상품이 장바구니에서 삭제되었습니다."}, status=200)
+        else:
+            cart_item.quantity = quantity
+            cart_item.save()
+            response_serializer = CartItemSerializer(cart_item)
+            return Response(response_serializer.data, status=200)
+        
+    @swagger_auto_schema(
+        operation_summary="장바구니 상품 삭제",
+        responses={200: "삭제 완료", 404: "상품을 찾을 수 없음"}
+    )
+    def delete(self, request, cart_product_id):
+        try:
+            cart_item = CartItem.objects.get(id=cart_product_id, user=request.user)
+            cart_item.delete()
+            return Response({"message": "상품이 장바구니에서 삭제되었습니다."}, status=200)
+        except CartItem.DoesNotExist:
+            return Response({"error": "장바구니에서 해당 상품을 찾을 수 없습니다."}, status=404)

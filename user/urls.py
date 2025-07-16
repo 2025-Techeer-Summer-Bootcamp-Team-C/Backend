@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import SignUpAPI, LoginView, LogoutView, CookieTokenRefreshView, CartItemCreateAPIView, CartItemListAPIView
+from .views import SignUpAPI, LoginView, LogoutView, CookieTokenRefreshView, CartItemCreateAPIView, CartItemListAPIView, CartItemUpdateAPIView
 
 urlpatterns = [
     path("signup", SignUpAPI.as_view(), name="api-signup"),
@@ -8,4 +8,5 @@ urlpatterns = [
     path("token/refresh", CookieTokenRefreshView.as_view()),
     path('cart', CartItemCreateAPIView.as_view(), name='cart-add'),
     path('cart/list', CartItemListAPIView.as_view(), name='cart-list'),
+    path('cart/<int:cart_product_id>', CartItemUpdateAPIView.as_view(), name='cart-update'),
 ]
