@@ -7,7 +7,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from user.models import User
 from product.models import Product
 from fitting.models import FittingResult
-from fitting.utils import upload_fitting_image_to_s3
+from fitting.utils import upload_fitting_image_to_s3, upload_bytes
 
 
 BITSTUDIO_API_KEY = os.environ["BITSTUDIO_API_KEY"]
@@ -211,8 +211,53 @@ def edit_bg_task(self, vto_image_id):
     for _ in range(36):
         info = requests.get(poll_url, headers={"Authorization": f"Bearer {BITSTUDIO_API_KEY}"}, timeout=15).json()
         if info["status"] == "completed" and info.get("path"):
-            return info["path"]          # ✅ 편집된 이미지 URL 반환
+            return info["path"]
         if info["status"] == "failed":
             return None
         time.sleep(5)
     return None
+
+@shared_task
+def generate_fitting_video_task(fitting_id):
+    fitting = FittingResult.objects.get(pk=fitting_id)
+    ext_id = fitting.external_id
+    video_url = None
+
+    # 최대 8분 5초마다 폴링
+    for _ in range(48):
+        time.sleep(10)
+        resp = requests.post(
+            "https://thenewblack.ai/api/1.1/wf/results_video",
+            files={
+                'email':    (None, settings.SECRET_EMAIL),
+                'password': (None, settings.SECRET_PASSWORD),
+                'id':       (None, ext_id),
+            }
+        )
+        if resp.status_code != 200:
+            continue
+        detail = resp.json().get('detail')
+        if detail and detail.startswith("http"):
+            video_url = detail
+            break
+
+    if not video_url:
+        fitting.status = 'failed'
+        fitting.save(update_fields=['status'])
+        return
+
+    # 비디오 다운로드
+    video_resp = requests.get(video_url, stream=True)
+    video_resp.raise_for_status()
+    video_bytes = video_resp.content
+
+    # S3 업로드 via utils.upload_bytes
+    # prefix 에 사용자·상품 구분자 추가
+    prefix = f"fitting_videos/{fitting.user.id}/{fitting.product.id}/"
+    # ext="mp4" 로 지정
+    s3_url = upload_bytes(prefix, video_bytes, ext="mp4")
+
+    # DB 업데이트
+    fitting.video = s3_url
+    fitting.status = 'completed'
+    fitting.save(update_fields=['video', 'status'])
