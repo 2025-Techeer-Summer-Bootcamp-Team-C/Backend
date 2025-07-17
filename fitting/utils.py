@@ -42,13 +42,10 @@ def upload_fitting_image_to_s3(
     variation: int | None = None,
     ext: str = "jpg",
 ) -> str:
-    """
-    fitting_images/{user_id}/{product_id}[_{variation}].jpg 형식으로 저장
-    """
     if variation is None:
-        key = f"fitting_images/{user_id}/{product_id}.{ext}"
+        key = f"fitting_images/{user_id}/{product_id}/{uuid.uuid4()}.{ext}"
     else:
-        key = f"fitting_images/{user_id}/{product_id}_{variation}.{ext}"
+        key = f"fitting_images/{user_id}/{product_id}_{variation}_{uuid.uuid4()}.{ext}"
 
     s3.upload_fileobj(
         io.BytesIO(image_data),
