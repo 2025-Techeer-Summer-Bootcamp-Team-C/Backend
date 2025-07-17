@@ -33,6 +33,12 @@ class ProductFittingGenerateView(APIView):
 
     def post(self, request):
         user = request.user
+        if user.is_fitting:
+            return Response(
+                {"error": "이미 가상 피팅을 완료했거나 피팅 중입니다."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         person_url = user.profile_image
         if not person_url:
             return Response({"error": "사용자 사진이 없습니다."}, status=400)
@@ -42,6 +48,11 @@ class ProductFittingGenerateView(APIView):
             return Response({"error": "상품이 없습니다."}, status=400)
 
         prompt = "Using the outfit image as the pose, lighting, and background reference, replace the model with the input person so that the person now wears the same clothes in the exact pose and setting. Preserve the model photo’s camera angle, framing, and white-studio background, but swap in the input person’s face, skin tone, hair, and body proportions. Ensure the clothes fit naturally to the new body and the overall result looks realistic and high-quality."
+        
+        # 시작 시점에 플래그 설정
+        user.is_fitting = True
+        user.save(update_fields=["is_fitting"])
+        
         # 상품별 태스크를 group으로 묶어 한꺼번에 예약
         tasks = [
             chain(
@@ -204,6 +215,13 @@ class ProductFittingGenerateDetailView(APIView):
 
     def post(self, request):
         user = request.user
+        
+        if user.is_fitting:
+            return Response(
+                {"error": "이미 가상 피팅을 완료했거나 피팅 중입니다."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
         person_url = user.profile_image
         if not person_url:
             return Response({"error": "사용자 사진이 없습니다."}, status=400)
@@ -213,6 +231,10 @@ class ProductFittingGenerateDetailView(APIView):
             return Response({"error": "상품이 없습니다."}, status=400)
 
         prompt = "Using the outfit image as the pose, lighting, and background reference, replace the model with the input person so that the person now wears the same clothes in the exact pose and setting. Preserve the model photo’s camera angle, framing, and white-studio background, but swap in the input person’s face, skin tone, hair, and body proportions. Ensure the clothes fit naturally to the new body and the overall result looks realistic and high-quality."
+        # 시작 시점에 플래그 설정
+        user.is_fitting = True
+        user.save(update_fields=["is_fitting"])
+
         # 상품별 태스크를 group으로 묶어 한꺼번에 예약
         tasks = [
             chain(
