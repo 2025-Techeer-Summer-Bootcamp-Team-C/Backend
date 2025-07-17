@@ -77,12 +77,25 @@ class LoginView(APIView):
         }
 
         resp = Response(data, status=status.HTTP_200_OK)
-        resp.set_cookie("access",  data["access_token"],
-                        httponly=True, samesite="Lax",
-                        secure=not settings.DEBUG, path="/", max_age=60*60)
-        resp.set_cookie("refresh", data["refresh_token"],
-                        httponly=True, samesite="Lax",
-                        secure=not settings.DEBUG, path="/", max_age=60*60*24*7)
+        resp.set_cookie(
+            key=settings.SIMPLE_JWT.get("AUTH_COOKIE_ACCESS", "access"),
+            value=data["access_token"],
+            httponly=settings.SIMPLE_JWT.get("AUTH_COOKIE_HTTP_ONLY", True),
+            samesite=settings.SIMPLE_JWT.get("AUTH_COOKIE_SAMESITE", "Lax"),
+            secure=settings.SIMPLE_JWT.get("AUTH_COOKIE_SECURE", not settings.DEBUG),
+            path=settings.SIMPLE_JWT.get("AUTH_COOKIE_PATH", "/"),
+            max_age=settings.SIMPLE_JWT.get("AUTH_COOKIE_ACCESS_MAX_AGE", 60 * 60 * 24),
+        )
+
+        resp.set_cookie(
+            key=settings.SIMPLE_JWT.get("AUTH_COOKIE_REFRESH", "refresh"),
+            value=data["refresh_token"],
+            httponly=settings.SIMPLE_JWT.get("AUTH_COOKIE_HTTP_ONLY", True),
+            samesite=settings.SIMPLE_JWT.get("AUTH_COOKIE_SAMESITE", "Lax"),
+            secure=settings.SIMPLE_JWT.get("AUTH_COOKIE_SECURE", not settings.DEBUG),
+            path=settings.SIMPLE_JWT.get("AUTH_COOKIE_PATH", "/"),
+            max_age=settings.SIMPLE_JWT.get("AUTH_COOKIE_REFRESH_MAX_AGE", 60 * 60 * 24 * 7),
+        )
         return resp
     
 class LogoutView(APIView):
@@ -146,14 +159,15 @@ class CookieTokenRefreshView(TokenRefreshView):
             status=status.HTTP_200_OK
         )
         resp.set_cookie(
-            key="access",
-            value=access_token,
-            httponly=True,
-            samesite="Lax",
-            secure=not settings.DEBUG,
-            path="/",
-            max_age=60 * 15,    
+        key=settings.SIMPLE_JWT.get("AUTH_COOKIE_ACCESS", "access"),
+        value=access_token,
+        httponly=settings.SIMPLE_JWT.get("AUTH_COOKIE_HTTP_ONLY", True),
+        samesite=settings.SIMPLE_JWT.get("AUTH_COOKIE_SAMESITE", "Lax"),
+        secure=settings.SIMPLE_JWT.get("AUTH_COOKIE_SECURE", not settings.DEBUG),
+        path=settings.SIMPLE_JWT.get("AUTH_COOKIE_PATH", "/"),
+        max_age=settings.SIMPLE_JWT.get("AUTH_COOKIE_ACCESS_MAX_AGE", 60 * 60 * 24), 
         )
+
         return resp
     
 class CartItemCreateAPIView(APIView):

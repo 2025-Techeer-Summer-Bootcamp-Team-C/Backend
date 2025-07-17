@@ -3,6 +3,7 @@ import pymysql
 from datetime import timedelta
 from dotenv import load_dotenv
 from kombu import Queue
+from datetime import timedelta
 
 pymysql.install_as_MySQLdb()
 load_dotenv()
@@ -101,9 +102,24 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 SIMPLE_JWT = {
-    "AUTH_COOKIE_ACCESS": "access",     
-    "AUTH_COOKIE_REFRESH": "refresh",
-    "AUTH_COOKIE_SAMESITE": "Lax",
+    # 🔑 JWT 설정
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=1),   # ✅ access 토큰 1일
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),  # 보통 7일~14일 정도
+
+    "ROTATE_REFRESH_TOKENS": False,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+
+    # 🍪 쿠키 관련 커스텀 설정 (이미 있는 값 유지 + 필요시 추가)
+    "AUTH_COOKIE_ACCESS": "access",      # access 토큰을 담는 쿠키 이름
+    "AUTH_COOKIE_REFRESH": "refresh",    # refresh 토큰을 담는 쿠키 이름
+    "AUTH_COOKIE_SAMESITE": "Lax",       
+    "AUTH_COOKIE_SECURE": False,         # 운영에서는 True 권장 (HTTPS일 때)
+    "AUTH_COOKIE_HTTP_ONLY": True,       # JS 접근 방지용
+    "AUTH_COOKIE_PATH": "/",
+    "AUTH_COOKIE_DOMAIN": None,          # 필요하면 도메인 명시
+    "AUTH_COOKIE_ACCESS_MAX_AGE": 60 * 60 * 24,  # ✅ access 쿠키 유지 1일
+    "AUTH_COOKIE_REFRESH_MAX_AGE": 60 * 60 * 24 * 7,  # refresh 쿠키 유지 7일
 }
 
 REST_FRAMEWORK = {
