@@ -285,7 +285,7 @@ class UpdateProfileImageAPI(APIView):
         profile_image_url = upload_profile_image_to_s3(str(user.id), image_bytes, ext)
 
         user.profile_image = profile_image_url
-        CartItem.objects.filter(user=user).update(is_fitting=False)
+        user.is_fitting = False
         user.save()
 
         return Response({

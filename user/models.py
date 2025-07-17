@@ -13,7 +13,8 @@ class User(AbstractUser):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="생성일")
     updated_at = models.DateTimeField(auto_now=True, null=True, blank=True, verbose_name="수정일")
     deleted_at = models.DateTimeField(null=True, blank=True, verbose_name="삭제일")
-
+    is_fitting = models.BooleanField(default=False, verbose_name="합성 여부")
+    
     def __str__(self):
         return f"{self.username} ({self.email})"
 
@@ -27,7 +28,6 @@ class CartItem(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
-    is_fitting = models.BooleanField(default=False, verbose_name="합성 여부")
 
     class Meta:
         unique_together = ('user', 'product')
