@@ -31,6 +31,31 @@ BITSTUDIO_API_KEY = os.getenv("BITSTUDIO_API_KEY")
 class ProductFittingGenerateView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        operation_summary="상품별 가상 피팅 작업 예약(퀄리티 낮음)",
+        operation_description="사용자의 프로필 사진과 모든 상품 이미지를 이용해 병렬로 가상 피팅 태스크를 예약합니다. 한 번만 실행 가능하며, 실행 중이거나 완료된 경우 재요청이 불가능합니다.",
+        responses={
+            202: openapi.Response(
+                description="가상 피팅 작업이 병렬로 예약되었습니다.",
+                examples={
+                    "application/json": {
+                        "message": "가상 피팅 작업이 병렬로 예약되었습니다.",
+                        "task_group_id": "string",
+                        "total_products": 10
+                    }
+                }
+            ),
+            400: openapi.Response(
+                description="잘못된 요청",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "error": openapi.Schema(type=openapi.TYPE_STRING)
+                    }
+                )
+            )
+        },
+    )
     def post(self, request):
         user = request.user
         if user.is_fitting:
@@ -213,6 +238,31 @@ plain white 배경으로 변경합니다.
 class ProductFittingGenerateDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        operation_summary="상품별 가상 피팅 작업 예약(퀄리티 높음)",
+        operation_description="사용자의 프로필 사진과 모든 상품 이미지를 이용해 비동기로 상세 가상 피팅 작업을 예약합니다. 이미 완료했거나 진행 중이면 재요청이 불가능합니다.",
+        responses={
+            202: openapi.Response(
+                description="상세 가상 피팅 작업이 병렬로 예약되었습니다.",
+                examples={
+                    "application/json": {
+                        "message": "가상 피팅 작업이 병렬로 예약되었습니다.",
+                        "task_group_id": "string",
+                        "total_products": 10
+                    }
+                }
+            ),
+            400: openapi.Response(
+                description="잘못된 요청",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "error": openapi.Schema(type=openapi.TYPE_STRING)
+                    }
+                )
+            )
+        },
+    )
     def post(self, request):
         user = request.user
         
@@ -259,6 +309,42 @@ class ProductFittingGenerateDetailView(APIView):
 class ProductFittingVideoGenerateView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        operation_summary="상품별 가상 피팅 영상 생성 요청",
+        operation_description="가상 피팅 이미지로부터 AI 영상을 생성 요청을 보냅니다. 이미 진행 중이거나 완료된 경우 상태에 따라 적절한 응답을 반환합니다.",
+        manual_parameters=[
+            openapi.Parameter(
+                name="product_id",
+                in_=openapi.IN_PATH,
+                type=openapi.TYPE_INTEGER,
+                required=True,
+                description="영상 생성을 요청할 상품 ID"
+            )
+        ],
+        responses={
+            202: openapi.Response(
+                description="영상 생성 요청을 받았습니다. 잠시 후 상태를 확인하세요.",
+                examples={
+                    "application/json": {"detail": "영상 생성 요청을 받았습니다. 잠시 후 상태를 확인하세요."}
+                }
+            ),
+            202: openapi.Response(
+                description="이미 영상 생성 요청이 진행 중입니다.",
+                examples={
+                    "application/json": {"detail": "이미 영상 생성 요청이 진행 중입니다."}
+                }
+            ),
+            400: openapi.Response(
+                description="영상이 이미 생성되어 있거나 잘못된 요청",
+                examples={
+                    "application/json": {"detail": "이미 영상이 생성되어 있습니다."}
+                }
+            ),
+            404: openapi.Response(
+                description="해당 상품 또는 피팅 결과를 찾을 수 없습니다."
+            )
+        },
+    )
     def post(self, request, product_id):
         product = get_object_or_404(Product, pk=product_id)
         fitting = get_object_or_404(
@@ -316,25 +402,43 @@ class ProductFittingVideoStatusView(APIView):
     permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
-        request_body=None,
+        operation_summary="가상 피팅 비디오 상태 조회",
+        operation_description="지정된 상품 ID의 가상 피팅 영상 생성 상태를 확인하고, 완료된 경우 S3에 저장된 비디오 URL을 반환합니다.",
         manual_parameters=[
             openapi.Parameter(
-                'product_id', openapi.IN_PATH,
-                description="피팅 대상 상품 ID",
+                name="product_id",
+                in_=openapi.IN_PATH,
+                description="피팅 대상 상품의 ID",
                 type=openapi.TYPE_INTEGER,
-                required=True
+                required=True,
             ),
         ],
-        responses={200: openapi.Response(
-            '현재 상태 및 비디오 URL',
-            schema=openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'status':    openapi.Schema(type=openapi.TYPE_STRING, description='pending|processing|completed|failed'),
-                    'video_url': openapi.Schema(type=openapi.TYPE_STRING, description='완료 시 S3 비디오 URL, 그 외 null'),
+        responses={
+            200: openapi.Response(
+                description="현재 상태 및 비디오 URL",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "status": openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="영상 생성 상태 (pending | processing | completed | failed)"
+                        ),
+                        "video_url": openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="상태가 ‘completed’ 일 때만 반환되는 S3 비디오 URL, 그 외에는 null"
+                        ),
+                    },
+                ),
+                examples={
+                    "application/json": {
+                        "status": "completed",
+                        "video_url": "https://cdn.example.com/videos/1/abcd.mp4"
+                    }
                 }
-            )
-        )}
+            ),
+            400: openapi.Response(description="잘못된 요청"),
+            404: openapi.Response(description="해당 상품 또는 피팅 결과를 찾을 수 없음"),
+        }
     )
     def get(self, request, product_id):
         # 1) 레코드 존재 확인
