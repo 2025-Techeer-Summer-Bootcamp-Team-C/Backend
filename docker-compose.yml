@@ -38,15 +38,18 @@ services:
             gunicorn --bind 0.0.0.0:8000 config.wsgi:application --timeout 300"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.backend.rule=Host(`backend.localhost`,`techeerfashion.shop`,`www.techeerfashion.shop`)"
+      # HTTP 라우터
+      - "traefik.http.routers.backend.rule=Host(`techeerfashion.shop`,`www.techeerfashion.shop`)"
       - "traefik.http.routers.backend.entrypoints=web"
-      - "traefik.http.services.backend.loadbalancer.server.port=8000"
-      # HTTPS
+      - "traefik.http.routers.backend.service=backend_service"
+      - "traefik.http.services.backend_service.loadbalancer.server.port=8000"
+      # HTTPS 라우터
       - "traefik.http.routers.backend-secure.rule=Host(`techeerfashion.shop`,`www.techeerfashion.shop`)"
       - "traefik.http.routers.backend-secure.entrypoints=websecure"
       - "traefik.http.routers.backend-secure.tls=true"
       - "traefik.http.routers.backend-secure.tls.certresolver=le"
-      - "traefik.http.services.backend-secure.loadbalancer.server.port=8000"
+      - "traefik.http.routers.backend-secure.service=backend_service"
+      - "traefik.http.services.backend_service.loadbalancer.server.port=8000"
     privileged: true
 
   traefik:
