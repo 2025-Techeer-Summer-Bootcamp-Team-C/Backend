@@ -140,8 +140,6 @@ REST_FRAMEWORK = {
     ],
 }
 
-CORS_ALLOW_CREDENTIALS = True
-
 SWAGGER_SETTINGS = {
     'SECURITY_DEFINITIONS': {
         'Bearer': {
@@ -173,11 +171,6 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
-
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-]
 
 # Celery 설정 추가
 CELERY_BROKER_URL = 'amqp://guest:guest@rabbitmq:5672/'
