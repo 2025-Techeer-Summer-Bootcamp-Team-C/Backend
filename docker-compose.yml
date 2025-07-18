@@ -39,17 +39,20 @@ services:
     labels:
       - "traefik.enable=true"
       # HTTP 라우터
-      - "traefik.http.routers.backend.rule=Host(`techeerfashion.shop`) || Host(`www.techeerfashion.shop`)"
+      - "traefik.http.routers.backend.rule=Host(`api.techeerfashion.shop`)"
       - "traefik.http.routers.backend.entrypoints=web"
       - "traefik.http.routers.backend.service=backend_service"
       - "traefik.http.services.backend_service.loadbalancer.server.port=8000"
+      # HTTP to HTTPS redirect
+      - "traefik.http.routers.backend.middlewares=https-redirect"
+      - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.https-redirect.redirectscheme.permanent=true"
       # HTTPS 라우터
-      - "traefik.http.routers.backend.rule=Host(`techeerfashion.shop`) || Host(`www.techeerfashion.shop`)"
+      - "traefik.http.routers.backend-secure.rule=Host(`api.techeerfashion.shop`)"
       - "traefik.http.routers.backend-secure.entrypoints=websecure"
       - "traefik.http.routers.backend-secure.tls=true"
-      - "traefik.http.routers.backend-secure.tls.certresolver=le"
+      - "traefik.http.routers.backend-secure.tls.certresolver=myresolver"
       - "traefik.http.routers.backend-secure.service=backend_service"
-      - "traefik.http.services.backend_service.loadbalancer.server.port=8000"
     privileged: true
 
   traefik:
@@ -65,16 +68,16 @@ services:
       # HTTPS entryPoint
       - "--entrypoints.websecure.address=:443"
       # ACME (Let's Encrypt) 설정
-      - "--certificatesresolvers.le.acme.email=ymkim2353@gmail.com"
-      - "--certificatesresolvers.le.acme.storage=/acme.json"
-      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.myresolver.acme.email=ymkim2353@gmail.com"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
     ports:
       - "80:80"
       - "443:443"
       - "8080:8080"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./acme.json:/acme.json
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./letsencrypt:/letsencrypt
     networks:
       - Backend-Net
 
@@ -151,6 +154,7 @@ services:
 volumes:
   db_data:
   static_volume:
+  letsencrypt:
 
 networks:
   Backend-Net:
