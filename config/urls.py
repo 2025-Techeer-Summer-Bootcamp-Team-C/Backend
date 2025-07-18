@@ -6,16 +6,6 @@ from drf_yasg import openapi
 from django.conf.urls.static import static
 from django.conf import settings
 import os
-from drf_yasg.generators import OpenAPISchemaGenerator
-
-class CustomSchemaGenerator(OpenAPISchemaGenerator):
-    def get_schema(self, request=None, public=False):
-        schema = super().get_schema(request, public)
-        if os.getenv('ENVIRONMENT') == 'prod':
-            schema.schemes = ['https']
-        else:
-            schema.schemes = ['http']
-        return schema
 
 if os.getenv('ENVIRONMENT') == 'prod':
     default_api_url = 'https://techeerfashion.shop/api/v1'
@@ -33,7 +23,6 @@ schema_view = get_schema_view(
     public=True,
     permission_classes=(permissions.AllowAny,),
     url=default_api_url,
-    generator_class=CustomSchemaGenerator
 )
 
 urlpatterns = [
