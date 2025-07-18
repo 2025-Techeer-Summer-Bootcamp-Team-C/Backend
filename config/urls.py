@@ -5,6 +5,12 @@ from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from django.conf.urls.static import static
 from django.conf import settings
+import os
+
+if os.getenv('ENVIRONMENT') == 'prod':
+    default_api_url = 'https://techeerfashion.shop/api/v1'
+else:
+    default_api_url = 'http://localhost:8000/api/v1'
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -16,6 +22,7 @@ schema_view = get_schema_view(
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
+    url=os.getenv('SWAGGER_BASE_URL') or default_api_url,
 )
 
 urlpatterns = [
