@@ -140,7 +140,13 @@ REST_FRAMEWORK = {
     ],
 }
 
+if os.getenv('ENVIRONMENT') == 'prod':
+    default_api_url = 'https://techeerfashion.shop/api/v1'
+else:
+    default_api_url = 'http://localhost:8000/api/v1'
+
 SWAGGER_SETTINGS = {
+    'DEFAULT_API_URL': default_api_url,
     'SECURITY_DEFINITIONS': {
         'Bearer': {
             'type': 'apiKey',
@@ -149,9 +155,10 @@ SWAGGER_SETTINGS = {
             'description': 'JWT 토큰을 입력하세요. 예: "Bearer {토큰}"',
         }
     },
-    'USE_SESSION_AUTH': False,  # 세션 인증 비활성화 (JWT만 사용)
-    'FETCH_WITH_CREDENTIALS': True, 
+    'USE_SESSION_AUTH': False,
+    'FETCH_WITH_CREDENTIALS': True,
 }
+
 
 
 SOCIALACCOUNT_STORE_TOKENS = True
