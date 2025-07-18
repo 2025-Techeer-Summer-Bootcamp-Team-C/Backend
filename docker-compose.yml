@@ -39,12 +39,12 @@ services:
     labels:
       - "traefik.enable=true"
       # HTTP 라우터
-      - "traefik.http.routers.backend.rule=Host(`techeerfashion.shop`,`www.techeerfashion.shop`)"
+      - "traefik.http.routers.backend.rule=Host(`techeerfashion.shop`) || Host(`www.techeerfashion.shop`)"
       - "traefik.http.routers.backend.entrypoints=web"
       - "traefik.http.routers.backend.service=backend_service"
       - "traefik.http.services.backend_service.loadbalancer.server.port=8000"
       # HTTPS 라우터
-      - "traefik.http.routers.backend-secure.rule=Host(`techeerfashion.shop`,`www.techeerfashion.shop`)"
+      - "traefik.http.routers.backend.rule=Host(`techeerfashion.shop`) || Host(`www.techeerfashion.shop`)"
       - "traefik.http.routers.backend-secure.entrypoints=websecure"
       - "traefik.http.routers.backend-secure.tls=true"
       - "traefik.http.routers.backend-secure.tls.certresolver=le"
