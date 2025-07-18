@@ -1,0 +1,20 @@
+# traefik.yml
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    exposedByDefault: false
+
+certResolvers:
+  le:
+    acme:
+      # 인증서 발급 알림을 받을 이메일
+      email: ymkim2353@gmail.com
+      storage: /acme.json
+      httpChallenge:
+        # 80번으로 HTTP 인증 처리
+        entryPoint: web
