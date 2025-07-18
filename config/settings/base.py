@@ -55,6 +55,14 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:8000",
+    "https://techeerfashion.shop",
+    "https://api.techeerfashion.shop",
+]
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "https://techeerfashion.shop",
+    "https://api.techeerfashion.shop",
 ]
 CORS_ALLOW_HEADERS = [
     'authorization',
@@ -133,11 +141,6 @@ REST_FRAMEWORK = {
 }
 
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  
-    "http://127.0.0.1:8000",
-    "http://13.209.170.5:8000",
-]
 
 SWAGGER_SETTINGS = {
     'SECURITY_DEFINITIONS': {
