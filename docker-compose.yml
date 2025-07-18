@@ -56,10 +56,18 @@ services:
     image: traefik:v2.10
     container_name: Board-Traefik
     command:
+      # 대시보드(옵션)
       - "--api.insecure=true"
+      # Docker provider 활성화
       - "--providers.docker=true"
+      # HTTP entryPoint
       - "--entrypoints.web.address=:80"
-      - "--configFile=/etc/traefik/traefik.yml"
+      # HTTPS entryPoint
+      - "--entrypoints.websecure.address=:443"
+      # ACME (Let's Encrypt) 설정
+      - "--certificatesresolvers.le.acme.email=ymkim2353@gmail.com"
+      - "--certificatesresolvers.le.acme.storage=/acme.json"
+      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
     ports:
       - "80:80"
       - "443:443"
