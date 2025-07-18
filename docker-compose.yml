@@ -117,6 +117,8 @@ services:
     tty: true
     networks:
       - Backend-Net
+    labels:
+      - "traefik.enable=false"
 
   celery_beat:
     container_name: celery_beat
@@ -135,6 +137,8 @@ services:
     tty: true
     networks:
       - Backend-Net
+    labels:
+      - "traefik.enable=false"
   
   flower:
     image: mher/flower
@@ -150,6 +154,8 @@ services:
       - celery_beat
     networks:
       - Backend-Net
+    labels:
+      - "traefik.enable=false"
 
 volumes:
   db_data:
