@@ -5,6 +5,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from django.db.models import Q
+from rest_framework.permissions import IsAuthenticated
 
 from .models import Product, ProductImage
 from .utils import upload_product_image
@@ -51,6 +52,9 @@ class ProductCreateListView(APIView):
         }, status=201)
 
         permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
+
+    permission_classes = [AllowAny]
     parser_classes = (MultiPartParser, FormParser)
 
     @swagger_auto_schema(
@@ -62,31 +66,39 @@ class ProductCreateListView(APIView):
                 in_=openapi.IN_QUERY,
                 type=openapi.TYPE_BOOLEAN,
                 required=False,
-                description="true: 피팅 합성 이미지(fitting_result.image), false: 상품 모델 이미지(product.image)",
+                description="true: 로그인한 사용자의 피팅 합성 이미지 / false: 상품 기본 이미지",
                 default=False,
             ),
         ],
-        responses={200: "상품 리스트"},
+        responses={200: "상품 리스트", 401: "로그인 필요"},
     )
     def get(self, request):
-        # 쿼리 파라미터에서 show_fitting 값을 받아옵니다. 기본값은 False
         show_fitting = request.GET.get('show_fitting', 'false').lower() == 'true'
         result = []
 
+        # product는 항상 기준이 되므로 미리 가져옴
+        products = Product.objects.filter(Q(is_deleted=False) | Q(is_deleted__isnull=True))
+
         if show_fitting:
-            # fitting_result 중 is_deleted=0(삭제안됨)만
-            fittings = FittingResult.objects.filter(is_deleted=False)
-            for fitting in fittings:
-                if fitting.product and fitting.image:
-                    result.append({
-                        "product_id": fitting.product.id,
-                        "name": fitting.product.name,
-                        "price": fitting.product.price,
-                        "image": fitting.image,        # 합성된 fitting_result 이미지 URL 반환
-                        "content": fitting.product.content
-                    })
+            # ✅ 인증 여부 확인
+            if not request.user.is_authenticated:
+                return Response({"detail": "로그인이 필요합니다."}, status=401)
+
+            # 현재 사용자 기준으로 fitting result 가져옴
+            fittings = FittingResult.objects.filter(user=request.user, is_deleted=False)
+            fitting_map = {f.product_id: f.image for f in fittings if f.product_id and f.image}
+
+            for product in products:
+                image = fitting_map.get(product.id, product.image)  # 피팅 결과가 없으면 기본 이미지 사용
+                result.append({
+                    "product_id": product.id,
+                    "name": product.name,
+                    "price": product.price,
+                    "image": image,
+                    "content": product.content
+                })
         else:
-            products = Product.objects.filter(Q(is_deleted=False) | Q(is_deleted__isnull=True))
+            # 🟢 기본 상품 모델 이미지만 보여줌 (비회원도 접근 가능)
             for product in products:
                 result.append({
                     "product_id": product.id,
