@@ -44,7 +44,7 @@ jobs:
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.PAT_FOR_DISPATCH }}
-          repository: hwanhee/backend-cd
+          repository: 2025-Techeer-Summer-Bootcamp-Team-C/deploy
           event-type: deploy-backend
           client-payload: |
             { "image_tag": "${{ steps.set_tag.outputs.DOCKER_IMAGE_TAG }}" }
