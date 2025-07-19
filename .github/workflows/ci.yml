@@ -19,8 +19,8 @@ jobs:
       - name: Set Docker Image Tag
         id: set_docker_image_tag
         run: |
-          if [ "${{ github.ref_name }}" == "main" ]; then
-            DOCKER_IMAGE_TAG="release-${{ github.run_number }}"
+          if [ "${{ github.ref_name }}" == "develop" ]; then
+            DOCKER_IMAGE_TAG="release-${{ github.event.pull_request.number }}"
           else
             DOCKER_IMAGE_TAG="pr-${{ github.event.pull_request.number }}-${{ github.run_number }}"
           fi
@@ -39,3 +39,12 @@ jobs:
         run: |
           docker build -t hwnahee/backend:$DOCKER_IMAGE_TAG .
           docker push hwnahee/backend:$DOCKER_IMAGE_TAG
+
+      - name: Trigger CD repo
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.PAT_FOR_DISPATCH }}
+          repository: hwanhee/backend-cd
+          event-type: deploy-backend
+          client-payload: |
+            { "image_tag": "${{ steps.set_tag.outputs.DOCKER_IMAGE_TAG }}" }

@@ -14,6 +14,4 @@ COPY . ./
 
 RUN python manage.py collectstatic --noinput
 
-RUN pip install google-generativeai
-
 RUN pip install --no-cache-dir Pillow
