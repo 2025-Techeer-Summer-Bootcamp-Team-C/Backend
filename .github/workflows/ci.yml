@@ -37,5 +37,5 @@ jobs:
         env:
           DOCKER_IMAGE_TAG: ${{ steps.set_docker_image_tag.outputs.DOCKER_IMAGE_TAG }}
         run: |
-          docker build -t hwanhee/backend:$DOCKER_IMAGE_TAG .
-          docker push hwanhee/backend:$DOCKER_IMAGE_TAG
+          docker build -t hwnahee/backend:$DOCKER_IMAGE_TAG .
+          docker push hwnahee/backend:$DOCKER_IMAGE_TAG
