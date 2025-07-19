@@ -3,7 +3,7 @@ name: Backend CI
 on:
   push:
     branches:
-      - main    # main 브랜치에 푸시될 때 실행
+      - develop
   pull_request:
     branches:
       - '**'    # 모든 브랜치 PR에도 실행
