@@ -5,7 +5,7 @@ ALLOWED_HOSTS = ["*"]  # 실제 도메인 또는 서버 IP
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
+        'ENGINE': 'django_prometheus.db.backends.mysql',
         'NAME': os.getenv('DATABASE_NAME'),
         'USER': os.getenv('DATABASE_USER'),
         'PASSWORD': os.getenv('DATABASE_PASSWORD'),
