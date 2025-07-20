@@ -180,6 +180,22 @@ services:
     networks:
       - Backend-Net
 
+  node_exporter:
+    image: prom/node-exporter:v1.8.1
+    container_name: node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      # '--path.rootfs=/rootfs'  # 삭제
+    ports:
+      - "9100:9100"
+    networks:
+      - Backend-Net
+
 volumes:
   db_data:
   static_volume:
