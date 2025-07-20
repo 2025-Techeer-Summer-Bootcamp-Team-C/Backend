@@ -196,6 +196,33 @@ services:
     networks:
       - Backend-Net
 
+  mysql-exporter: #서비스 이름
+    image: prom/mysqld-exporter:main #이미지
+    container_name: mysql-exporter
+    ports:
+      - "9104:9104" #포트 9104 매핑
+    volumes:
+      - ./mysql-exporter/my-config.conf:/cfg/my-config.conf #conf파일을 위한 로컬 볼륨 마운트
+    environment: # 메트릭 수집할 내용 & 데이터 주소
+      - DATA_SOURCE_NAME='root:root@(db:3306)/test' # rds로 올렸으면 이 부분은 다른 서비스들에서 디비 연결 하시는거로 사용하시면 됩니다. (루트 미사용시 수집되는 메트릭이 다를수 있습니다)
+      - collect.info_schema.tablestats=true
+      - collect.info_schema.userstats=true
+      - collect.info_schema.query_response_time=true
+      - collect.auto_increment.columns=true
+      - collect.binlog_size=true
+      - collect.perf_schema.eventsstatements=true
+      - collect.perf_schema.eventswaits=true
+      - collect.perf_schema.file_events=true
+      - collect.perf_schema.indexiowaits=true
+      - collect.perf_schema.tableiowaits=true
+      - collect.perf_schema.tablelocks=true
+    networks:
+      - Backend-Net
+    depends_on:
+      - db #디비가 올라가야지 메트릭 수집을 하죠
+    command:
+      - '--config.my-cnf=/cfg/my-config.conf' #로컬 볼륨에 마운트된 conf파일 설정
+
 volumes:
   db_data:
   static_volume:
