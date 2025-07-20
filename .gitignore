@@ -23,3 +23,6 @@ db.sqlite3
 
 letsencrypt/
 
+grafana/data/
+grafana/plugins/
+grafana.log
