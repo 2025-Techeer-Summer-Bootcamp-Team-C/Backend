@@ -219,7 +219,7 @@ services:
     networks:
       - Backend-Net
     depends_on:
-      - db #디비가 올라가야지 메트릭 수집을 하죠
+      - db
     command:
       - '--config.my-cnf=/cfg/my-config.conf' #로컬 볼륨에 마운트된 conf파일 설정
 
