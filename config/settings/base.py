@@ -58,14 +58,14 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:8000",
-    "https://techeerfashion.shop",
-    "https://api.techeerfashion.shop",
+    "https://morphmall.shop",
+    "https://api.morphmall.shop",
 ]
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-    "https://techeerfashion.shop",
-    "https://api.techeerfashion.shop",
+    "https://morphmall.shop",
+    "https://api.morphmall.shop",
 ]
 CORS_ALLOW_HEADERS = [
     'authorization',
@@ -144,7 +144,7 @@ REST_FRAMEWORK = {
 }
 
 if os.getenv('ENVIRONMENT') == 'prod':
-    default_api_url = 'https://techeerfashion.shop/api/v1'
+    default_api_url = 'https://morphmall.shop/api/v1'
 else:
     default_api_url = 'http://localhost:8000/api/v1'
 
