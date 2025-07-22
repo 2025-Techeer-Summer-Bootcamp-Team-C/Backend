@@ -8,7 +8,7 @@ from django.conf import settings
 import os
 
 if os.getenv('ENVIRONMENT') == 'prod':
-    default_api_url = 'https://techeerfashion.shop/api/v1'
+    default_api_url = 'https://morphmall.shop/api/v1'
 else:
     default_api_url = 'http://localhost:8000/api/v1'
 
