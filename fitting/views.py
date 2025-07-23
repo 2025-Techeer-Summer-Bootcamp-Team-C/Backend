@@ -14,7 +14,7 @@ from .serializers import GenerateVTORequestSerializer, VTORequestSerializer, Gen
 import requests
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from celery import chord
-from .tasks import run_vto_url_task, save_to_s3_and_db, run_vto_edit_url_task, edit_bg_task, generate_fitting_video_task
+from .tasks import run_vto_url_task, save_to_s3_and_db, run_vto_edit_url_task, edit_bg_task, generate_fitting_video_task, fake_run_vto, fake_edit_bg, fake_save_to_s3_and_db
 from .utils      import upload_bytes, upload_url
 from .models     import UserImage
 from celery import group, chain
@@ -450,3 +450,53 @@ class ProductFittingVideoStatusView(APIView):
             'status':    fitting.status,
             'video_url': fitting.video if fitting.status == 'completed' else None
         }, status=status.HTTP_200_OK)
+        
+def select_tasks(use_mock: bool):
+    if use_mock or getattr(settings, "MOCK_VTO", False):
+        return fake_run_vto, fake_edit_bg, fake_save_to_s3_and_db
+    return run_vto_edit_url_task, edit_bg_task, save_to_s3_and_db
+
+
+class ProductFittingGenerateMockDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+    mock = True
+
+    @swagger_auto_schema( ... )  # 기존 그대로
+    def post(self, request, *args, **kwargs):
+        self.mock = True
+        RUN_VTO, EDIT_BG, SAVE = select_tasks(self.mock)
+
+        user = request.user
+        if user.is_fitting:
+            return Response({"error": "이미 가상 피팅을 완료했거나 피팅 중입니다."}, status=400)
+
+        person_url = user.profile_image
+        if not person_url:
+            return Response({"error": "사용자 사진이 없습니다."}, status=400)
+
+        products = Product.objects.all()
+        if not products.exists():
+            return Response({"error": "상품이 없습니다."}, status=400)
+
+        prompt = "Using the outfit image as the pose, lighting, and background reference, ..."  # 기존 그대로
+
+        user.is_fitting = True
+        user.save(update_fields=["is_fitting"])
+
+        tasks = [
+            chain(
+                RUN_VTO.s(person_url, product.image, prompt),
+                EDIT_BG.s(),
+                SAVE.s(user.id, product.id)
+            )
+            for product in products
+        ]
+        job = group(tasks).apply_async()
+
+        return Response(
+            {"message": "가상 피팅 작업이 병렬로 예약되었습니다.",
+             "task_group_id": job.id,
+             "total_products": products.count(),
+             "mock": self.mock},
+            status=202
+        )
