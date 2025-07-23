@@ -60,12 +60,14 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8000",
     "https://morphmall.shop",
     "https://api.morphmall.shop",
+    "https://www.morphmall.shop",
 ]
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
     "https://morphmall.shop",
     "https://api.morphmall.shop",
+    "https://www.morphmall.shop",
 ]
 CORS_ALLOW_HEADERS = [
     'authorization',
