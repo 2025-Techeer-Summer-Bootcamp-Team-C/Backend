@@ -1,4 +1,4 @@
-import os, time, requests
+import os, time, requests, uuid, random
 import requests, io
 from celery import shared_task
 from django.conf import settings
@@ -211,3 +211,38 @@ def generate_fitting_video_task(fitting_id, task_id):
     fitting.video = s3_url
     fitting.status = 'completed'
     fitting.save(update_fields=['video', 'status'])
+    
+@shared_task(bind=True, max_retries=3, default_retry_delay=5, name="fitting.fake_run_vto")
+def fake_run_vto(self, person_url, outfit_url, prompt):
+    time.sleep(random.uniform(25, 35))  # 30초 근처
+    # 10% 확률로 실패도 흉내
+    if random.random() < 0.1:
+        raise self.retry(exc=Exception("fake VTO error"))
+    return f"fake-id-{uuid.uuid4()}"
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=5, name="fitting.fake_edit_bg")
+def fake_edit_bg(self, vto_image_id):
+    time.sleep(random.uniform(25, 35))
+    if random.random() < 0.05:
+        return None  # 실패 케이스
+    return "https://placehold.co/1024x1536.png?text=FAKE_EDIT_BG"
+
+@shared_task(bind=True, max_retries=2, default_retry_delay=10, name="fitting.fake_save_to_s3_and_db")
+def fake_save_to_s3_and_db(self, vto_url: str, user_id: int, product_id: int):
+    if not vto_url:
+        return None
+    # 실제 다운로드/업로드 없음. 바로 DB만 업데이트 등.
+    from django.contrib.auth import get_user_model
+    from product.models import Product
+    from fitting.models import FittingResult
+
+    User = get_user_model()
+    user = User.objects.get(id=user_id)
+    product = Product.objects.get(id=product_id)
+
+    FittingResult.objects.update_or_create(
+        user=user,
+        product=product,
+        defaults={"user": user, "image": vto_url}
+    )
+    return vto_url
