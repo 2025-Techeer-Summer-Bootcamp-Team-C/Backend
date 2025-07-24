@@ -25,4 +25,4 @@ letsencrypt/
 
 grafana/data/
 grafana/plugins/
-grafana.log
+grafana.log"grafana/data" 
