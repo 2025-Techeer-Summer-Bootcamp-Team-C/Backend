@@ -36,17 +36,18 @@ class SignUpAPI(generics.CreateAPIView):
 
         if image_file:
             image_bytes = image_file.read()
-            profile_image_url = upload_profile_image_to_s3(str(user.id), image_bytes)
-
+            ext = image_file.name.split('.')[-1].lower()
+            profile_image_url = upload_profile_image_to_s3(str(user.id), image_bytes, ext)
             user.profile_image = profile_image_url
-            user.save() 
-
+            user.is_fitting = False
+            user.save()
+            
         return Response({
             "message": "회원가입이 완료되었습니다.",
             "user_id": user.id,
             "profile_image_url": user.profile_image
         }, status=201)
-
+                
 class LoginView(APIView):
     serializer_class = LoginSerializer
     permission_classes = [AllowAny]
