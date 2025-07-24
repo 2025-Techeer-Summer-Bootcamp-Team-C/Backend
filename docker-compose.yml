@@ -101,7 +101,6 @@ services:
       - Backend-Net
 
   celery_worker:
-    container_name: celery_worker
     build:
       context: .
     volumes:
@@ -109,7 +108,7 @@ services:
     command: >
       celery -A config worker
       --pool=eventlet
-      --concurrency=500
+      --concurrency=250
       --loglevel=info
     environment:
       - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
