@@ -59,18 +59,19 @@ services:
     image: traefik:v2.10
     container_name: Board-Traefik
     command:
-      # 대시보드(옵션)
       - "--api.insecure=true"
-      # Docker provider 활성화
       - "--providers.docker=true"
-      # HTTP entryPoint
       - "--entrypoints.web.address=:80"
-      # HTTPS entryPoint
       - "--entrypoints.websecure.address=:443"
-      # ACME (Let's Encrypt) 설정
       - "--certificatesresolvers.myresolver.acme.email=ymkim2353@gmail.com"
       - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
       - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      # 로그 설정
+      - "--log.level=INFO"
+      - "--accesslog=true"
+      - "--accesslog.format=json"
+      - "--accesslog.fields.defaultmode=keep"
+      - "--accesslog.filepath=/logs/access.log"
     ports:
       - "80:80"
       - "443:443"
@@ -78,6 +79,47 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./letsencrypt:/letsencrypt
+      - ./traefik-logs:/logs
+    networks:
+      - Backend-Net
+    labels:
+      logging: "promtail"
+      logging_jobname: "traefiklogs"
+    restart: always
+
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - Backend-Net
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: promtail
+    volumes:
+      - ./promtail/config.yaml:/etc/promtail/docker-config.yaml
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./traefik-logs:/logs
+    command:
+      - -config.file=/etc/promtail/docker-config.yaml
+      - -config.expand-env=true
+    depends_on:
+      - loki
+    networks:
+      - Backend-Net
+
+  grafana:
+    image: grafana/grafana:9.5.20
+    container_name: grafana
+    volumes:
+      - ./grafana:/etc/grafana/provisioning
+      - ./grafana/data:/var/lib/grafana
+    ports:
+      - "3000:3000"
     networks:
       - Backend-Net
 
@@ -169,17 +211,6 @@ services:
     networks:
       - Backend-Net
 
-  grafana:
-    image: grafana/grafana:9.5.20
-    container_name: grafana
-    volumes:
-      - ./grafana:/etc/grafana/provisioning
-      - ./grafana/data:/var/lib/grafana
-    ports:
-      - "3000:3000"
-    networks:
-      - Backend-Net
-
   node_exporter:
     image: prom/node-exporter:v1.8.1
     container_name: node-exporter
@@ -190,21 +221,20 @@ services:
     command:
       - '--path.procfs=/host/proc'
       - '--path.sysfs=/host/sys'
-      # '--path.rootfs=/rootfs'  # 삭제
     ports:
       - "9100:9100"
     networks:
       - Backend-Net
 
-  mysql-exporter: #서비스 이름
-    image: prom/mysqld-exporter:main #이미지
+  mysql-exporter:
+    image: prom/mysqld-exporter:main
     container_name: mysql-exporter
     ports:
-      - "9104:9104" #포트 9104 매핑
+      - "9104:9104"
     volumes:
-      - ./mysql-exporter/my-config.conf:/cfg/my-config.conf #conf파일을 위한 로컬 볼륨 마운트
-    environment: # 메트릭 수집할 내용 & 데이터 주소
-      - DATA_SOURCE_NAME='root:root@(db:3306)/test' # rds로 올렸으면 이 부분은 다른 서비스들에서 디비 연결 하시는거로 사용하시면 됩니다. (루트 미사용시 수집되는 메트릭이 다를수 있습니다)
+      - ./mysql-exporter/my-config.conf:/cfg/my-config.conf
+    environment:
+      - DATA_SOURCE_NAME='root:root@(db:3306)/test'
       - collect.info_schema.tablestats=true
       - collect.info_schema.userstats=true
       - collect.info_schema.query_response_time=true
@@ -219,20 +249,20 @@ services:
     networks:
       - Backend-Net
     depends_on:
-      - db #디비가 올라가야지 메트릭 수집을 하죠
+      - db
     command:
-      - '--config.my-cnf=/cfg/my-config.conf' #로컬 볼륨에 마운트된 conf파일 설정
+      - '--config.my-cnf=/cfg/my-config.conf'
 
-  cadvisor: #서비스 이름
-    image: gcr.io/cadvisor/cadvisor:v0.49.1 #이미지
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
     container_name: cadvisor
     ports:
-      - "8090:8080" #포트 8080 매핑
+      - "8090:8080"
     volumes:
-      - /:/rootfs:ro #읽기 전용 데이터 - 루트 파일 시스템
-      - /var/run:/var/run:rw #읽기 & 쓰기 - 런타임 데이터
-      - /sys:/sys:ro  #읽기 전용 데이터 - 커널, 하드웨어, 드라이버 정보 등등
-      - /var/lib/docker/:/var/lib/docker:ro #읽기 전용 데이터 - 도커 정보 데이터
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
     networks:
       - Backend-Net
 

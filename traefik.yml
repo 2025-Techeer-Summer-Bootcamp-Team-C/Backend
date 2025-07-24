@@ -18,3 +18,11 @@ certResolvers:
       httpChallenge:
         # 80번으로 HTTP 인증 처리
         entryPoint: web
+
+log:
+  level: INFO
+
+accessLog:
+  format: json
+  fields:
+    defaultMode: keep

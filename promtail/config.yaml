@@ -1,0 +1,40 @@
+# https://grafana.com/docs/loki/latest/clients/promtail/configuration/
+# https://docs.docker.com/engine/api/v1.41/#operation/ContainerList
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: debug
+
+positions:
+  filename: /tmp/positions.yaml #포지션 파일
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push #로키 api 위치. 여기로 로그를 보냅니다
+
+scrape_configs:
+  - job_name: flog_scrape
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock # 도커 설정
+        refresh_interval: 5s
+        filters:
+          - name: label
+            values: ["logging=promtail"] #컴포즈에 logging=promtail 라벨 있는 곳만 로그 수집
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name'] #로그 라벨링
+        regex: '/(.*)'
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_log_stream'] #로그 라벨링
+        target_label: 'logstream'
+      - source_labels: ['__meta_docker_container_label_logging_jobname'] #로그 라벨링
+        target_label: 'job'
+      - source_labels: ['__meta_docker_port_public'] #로그 라벨링
+        target_label: 'port'
+      - source_labels: ['__meta_docker_network_ip'] #로그 라벨링
+        target_label: 'ip'
+  - job_name: traefik_accesslog
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: "traefik_accesslog"
+          __path__: /logs/access.log 
