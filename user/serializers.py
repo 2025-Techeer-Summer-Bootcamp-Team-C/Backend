@@ -5,11 +5,10 @@ from .models import User, CartItem
 
 class SignUpSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(write_only=True)
-    profile_image = serializers.ImageField(required=False)
 
     class Meta:
         model = User
-        fields = ("username", "email", "password", "password2", "profile_image") 
+        fields = ("username", "email", "password", "password2") 
         extra_kwargs = {
             "password": {"write_only": True},
         }

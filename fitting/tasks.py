@@ -4,7 +4,7 @@ from celery import shared_task
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 
-from user.models import User
+from user.models import User, UserImage
 from product.models import Product
 from fitting.models import FittingResult
 from fitting.utils import upload_fitting_image_to_s3, upload_bytes
@@ -58,7 +58,7 @@ def run_vto_url_task(self, person_url, outfit_url, prompt):
         raise self.retry(exc=exc)
     
 @shared_task(bind=True, max_retries=2, default_retry_delay=10)
-def save_to_s3_and_db(self, vto_url: str, user_id: int, product_id: int):
+def save_to_s3_and_db(self, vto_url: str, user_image_id: int, product_id: int):
     if not vto_url:
         return None   # 이전 태스크 실패한 경우
 
@@ -70,20 +70,20 @@ def save_to_s3_and_db(self, vto_url: str, user_id: int, product_id: int):
 
         # 2) S3 업로드
         s3_url = upload_fitting_image_to_s3(
-            user_id=user_id,
+            user_image_id=user_image_id,
             product_id=product_id,
             image_data=img_bytes
         )
 
-        # 3) DB 저장 (상품 1:1)
-        user = User.objects.get(id=user_id)
+        # 3) DB 저장
+        user_image = UserImage.objects.get(id=user_image_id)
         product = Product.objects.get(id=product_id)
 
         FittingResult.objects.update_or_create(
-            user = user,
+            user_image = user_image,
             product=product,                # 1:1 관계 기준
             defaults={
-                "user":  user,
+                "user_image":  user_image,
                 "image": s3_url
             }
         )

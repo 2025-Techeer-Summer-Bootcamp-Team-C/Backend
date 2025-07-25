@@ -21,31 +21,20 @@ from product.models import Product
 class SignUpAPI(generics.CreateAPIView):
     serializer_class = SignUpSerializer
     permission_classes = [permissions.AllowAny]
-    parser_classes = [parsers.MultiPartParser, parsers.FormParser]
 
     @swagger_auto_schema(
         operation_summary="회원가입",
         consumes=["multipart/form-data"],
     )
     def post(self, request, *args, **kwargs):
-        image_file = request.FILES.get("profile_image")
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save() 
-
-        if image_file:
-            image_bytes = image_file.read()
-            ext = image_file.name.split('.')[-1].lower()
-            profile_image_url = upload_profile_image_to_s3(str(user.id), image_bytes, ext)
-            user.profile_image = profile_image_url
-            user.is_fitting = False
-            user.save()
             
         return Response({
             "message": "회원가입이 완료되었습니다.",
             "user_id": user.id,
-            "profile_image_url": user.profile_image
         }, status=201)
                 
 class LoginView(APIView):
