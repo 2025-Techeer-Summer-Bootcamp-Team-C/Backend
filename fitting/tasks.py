@@ -134,39 +134,79 @@ def run_vto_edit_url_task(self, person_url, outfit_url, prompt):
     except Exception as exc:
         raise self.retry(exc=exc)
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=5)
+@shared_task(
+    bind=True,
+    max_retries=5,
+    default_retry_delay=2,
+    rate_limit='10/s'   # 워커 전체 초당 10회 이하
+)
 def edit_bg_task(self, vto_image_id):
-    # 1) Edit 요청
-    r = requests.post(
-        f"https://api.bitstudio.ai/images/{vto_image_id}/edit",
-        headers={"Authorization": f"Bearer {BITSTUDIO_API_KEY}",
-                 "Content-Type":  "application/json"},
-        json={
-            "prompt":      "Replace the background with a soft light-gray studio backdrop (#e8e8e8) and add a subtle floor shadow under the model for realism",
-            "resolution":  "standard",
-            "num_images":  1,
-            "seed":        42
-        },
-        timeout=60,
-    ).json()
+    # vto_image_id가 None으로 넘어오면 재시도
+    if not vto_image_id:
+        raise self.retry(exc=ValueError("vto_image_id is None"), countdown=2)
 
-    ver = r["versions"][0]
+    # 1) Edit 요청
+    try:
+        resp = requests.post(
+            f"https://api.bitstudio.ai/images/{vto_image_id}/edit",
+            headers={
+                "Authorization": f"Bearer {BITSTUDIO_API_KEY}",
+                "Content-Type":  "application/json"
+            },
+            json={
+                "prompt":     "Replace the background with a soft light-gray studio backdrop (#e8e8e8) "
+                              "and add a subtle floor shadow under the model for realism",
+                "resolution": "standard",
+                "num_images": 1,
+                "seed":       42
+            },
+            timeout=60,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except requests.exceptions.HTTPError as exc:
+        # 429일 때 지수 백오프 재시도
+        if exc.response.status_code == 429:
+            countdown = min(2 ** self.request.retries, 60)
+            raise self.retry(exc=exc, countdown=countdown)
+        # 그 외 HTTP 에러는 실패 처리
+        raise
+    except requests.RequestException as exc:
+        # 네트워크 오류 등도 재시도
+        raise self.retry(exc=exc)
+
+    # 버전 정보 파싱
+    ver = data["versions"][0]
     result_id = ver.get("source_image_id") or ver["id"]
-    poll_url  = (
+    poll_url = (
         f"https://api.bitstudio.ai/images/{result_id}"
-        if ver.get("source_image_id") else
-        f"https://api.bitstudio.ai/images/versions/{result_id}"
+        if ver.get("source_image_id")
+        else f"https://api.bitstudio.ai/images/versions/{result_id}"
     )
 
     # 2) 폴링 (5 s × 36 = 3분)
     for _ in range(36):
-        info = requests.get(poll_url, headers={"Authorization": f"Bearer {BITSTUDIO_API_KEY}"}, timeout=15).json()
-        if info["status"] == "completed" and info.get("path"):
+        try:
+            info = requests.get(
+                poll_url,
+                headers={"Authorization": f"Bearer {BITSTUDIO_API_KEY}"},
+                timeout=15
+            ).json()
+        except requests.RequestException as exc:
+            # 폴링 중 네트워크 오류 발생 시 재시도
+            raise self.retry(exc=exc)
+
+        status = info.get("status")
+        if status == "completed" and info.get("path"):
             return info["path"]
-        if info["status"] == "failed":
-            return None
+        if status == "failed":
+            # 비즈니스 실패도 재시도
+            raise self.retry(exc=RuntimeError("edit_bg status=failed"))
+
         time.sleep(5)
-    return None
+
+    # 타임아웃도 재시도
+    raise self.retry(exc=TimeoutError("edit_bg polling timeout"))
 
 @shared_task
 def generate_fitting_video_task(fitting_id, task_id):
