@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from user.models import UserImage
 
 class UserImage(models.Model):
     user_id = models.ForeignKey(
@@ -21,12 +22,12 @@ class UserImage(models.Model):
         return f"UserImage {self.id}"
 
 class FittingResult(models.Model):
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+    user_image = models.ForeignKey(
+        UserImage,
         on_delete=models.CASCADE,
         related_name='fitting_results',
-        verbose_name="사용자 아이디"
-        )
+        verbose_name="사용자 사진 아이디"
+    )
     product = models.ForeignKey(
         'product.Product',
         on_delete=models.CASCADE,
