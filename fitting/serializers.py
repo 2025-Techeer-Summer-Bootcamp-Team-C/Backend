@@ -34,3 +34,6 @@ class ChangeBgSerializer(serializers.Serializer):
         # 하나만 남기도록 정리
         data["image"] = data.pop("image_file", data.get("image"))
         return data
+
+class ProfileImageSerializer(serializers.Serializer):
+    profile_image = serializers.ImageField(help_text="업로드할 사용자 프로필 이미지")

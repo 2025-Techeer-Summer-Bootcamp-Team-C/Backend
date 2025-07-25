@@ -10,12 +10,12 @@ from django.conf import settings
 from openai import OpenAI
 from rest_framework.parsers import MultiPartParser, FormParser
 import base64
-from .serializers import GenerateVTORequestSerializer, VTORequestSerializer, GenerateVTOProductRequestSerializer, VTOTestRequestSerializer, ChangeBgSerializer
+from .serializers import GenerateVTORequestSerializer, VTORequestSerializer, GenerateVTOProductRequestSerializer, VTOTestRequestSerializer, ChangeBgSerializer, ProfileImageSerializer
 import requests
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from celery import chord
 from .tasks import run_vto_url_task, save_to_s3_and_db, run_vto_edit_url_task, edit_bg_task, generate_fitting_video_task, fake_run_vto, fake_edit_bg, fake_save_to_s3_and_db
-from .utils      import upload_bytes, upload_url
+from .utils      import upload_bytes, upload_url, upload_profile_image_to_s3
 from .models     import UserImage
 from celery import group, chain
 from product.models import Product
@@ -240,10 +240,16 @@ plain white 배경으로 변경합니다.
         
 class ProductFittingGenerateDetailView(APIView):
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
 
     @swagger_auto_schema(
         operation_summary="상품별 가상 피팅 작업 예약(퀄리티 높음)",
-        operation_description="사용자의 프로필 사진과 모든 상품 이미지를 이용해 비동기로 상세 가상 피팅 작업을 예약합니다. 이미 완료했거나 진행 중이면 재요청이 불가능합니다.",
+        operation_description=(
+            "사용자의 프로필 사진을 파일로 업로드하고, "
+            "모든 상품 이미지를 이용해 비동기로 상세 가상 피팅 작업을 예약합니다. "
+            "이미 완료했거나 진행 중이면 재요청이 불가능합니다."
+        ),
+        request_body=ProfileImageSerializer,
         responses={
             202: openapi.Response(
                 description="상세 가상 피팅 작업이 병렬로 예약되었습니다.",
@@ -264,29 +270,33 @@ class ProductFittingGenerateDetailView(APIView):
                     }
                 )
             )
-        },
+        }
     )
     def post(self, request):
         user = request.user
         
-        if user.is_fitting:
+        profile_image = request.FILES.get('profile_image')
+        if not profile_image:
             return Response(
-                {"error": "이미 가상 피팅을 완료했거나 피팅 중입니다."},
+                {"error": "프로필 이미지를 첨부해주세요."},
                 status=status.HTTP_400_BAD_REQUEST
             )
             
-        person_url = user.profile_image
-        if not person_url:
-            return Response({"error": "사용자 사진이 없습니다."}, status=400)
-
+        ext = profile_image.name.split('.')[-1]
+        image_bytes = profile_image.read()
+        person_url = upload_profile_image_to_s3(str(user.id), image_bytes, ext)
+        
+        user_image = UserImage.objects.create(
+            user=user,
+            image=person_url,
+            is_fitting=True
+        )
+        
         products = Product.objects.all()
         if not products.exists():
             return Response({"error": "상품이 없습니다."}, status=400)
 
         prompt = "Using the outfit image as the pose, lighting, and background reference, replace the model with the input person so that the person now wears the same clothes in the exact pose and setting. Preserve the model photo’s camera angle, framing, and white-studio background, but swap in the input person’s face, skin tone, hair, and body proportions. Ensure the clothes fit naturally to the new body and the overall result looks realistic and high-quality."
-        # 시작 시점에 플래그 설정
-        user.is_fitting = True
-        user.save(update_fields=["is_fitting"])
 
         batch_size = 3
         batches = [
@@ -301,19 +311,18 @@ class ProductFittingGenerateDetailView(APIView):
             task_chain = chain(
                 run_vto_edit_url_task.s(person_url, product.image, prompt),
                 edit_bg_task.s(),
-                save_to_s3_and_db.s(user.id, product.id),
+                save_to_s3_and_db.s(user_image.id, product.id),
             )
             # 3개마다 1초씩 지연: idx 0,1,2 -> 0s, 3,4,5 -> 1s, …
             seconds_delay = idx // 2
             eta = now + datetime.timedelta(seconds=seconds_delay)
             # 개별적으로 ETA 스케줄
             task_chain.apply_async(eta=eta)
-
+        
         return Response(
             {
                 "message": "가상 피팅 작업이 3개씩 1초 간격으로 큐에 예약되었습니다.",
                 "total_products": len(products),
-                "mock": self.mock
             },
             status=202
         )

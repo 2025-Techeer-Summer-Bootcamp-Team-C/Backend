@@ -78,7 +78,7 @@ def upload_fitting_image_to_s3(
     )
     return f"{CLOUDFRONT_DOMAIN}/{key}"
 
-def upload_fitting_image_to_s3(user_id, product_id, image_data, ext="jpg", resize=True):
+def upload_fitting_image_to_s3(user_image_id, product_id, image_data, ext="jpg", resize=True):
     """
     리사이즈/재압축 후 S3 저장. resize=False면 해상도 그대로, True면 800x800 이하 비율 유
     """
@@ -88,11 +88,26 @@ def upload_fitting_image_to_s3(user_id, product_id, image_data, ext="jpg", resiz
     else:
         # 해상도 그대로, 재압축만
         image_bytes = compress_image_bytes(image_data)
-    key = f"fitting_images/{user_id}/{product_id}/{uuid.uuid4()}.{ext}"
+    key = f"fitting_images/{user_image_id}/{product_id}/{uuid.uuid4()}.{ext}"
     s3.upload_fileobj(
         io.BytesIO(image_bytes),
         BUCKET,
         key,
         ExtraArgs={"ContentType": f"image/{ext}", "ContentDisposition": "inline"},
+    )
+    return f"{CLOUDFRONT_DOMAIN}/{key}"
+
+def upload_profile_image_to_s3(user_id: str, image_bytes: bytes, ext: str = "jpg") -> str:
+    # 리사이즈 적용
+    resized_bytes = resize_image_keep_ratio(image_bytes, max_size=(800, 800))
+    key = f"profiles/{user_id}/{uuid.uuid4()}.{ext}"
+    s3.upload_fileobj(
+        io.BytesIO(resized_bytes),
+        BUCKET,
+        key,
+        ExtraArgs={
+            "ContentType": f"image/{ext}",
+            "ContentDisposition": "inline",
+        },
     )
     return f"{CLOUDFRONT_DOMAIN}/{key}"
