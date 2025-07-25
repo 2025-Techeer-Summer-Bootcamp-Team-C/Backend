@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'product',
     'category',
     'django_prometheus',
+    'order',
 ]
 
 MIDDLEWARE = [
