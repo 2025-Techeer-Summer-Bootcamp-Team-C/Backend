@@ -23,6 +23,9 @@ from django.core.files.uploadedfile import UploadedFile
 from django.shortcuts import get_object_or_404
 from .models import FittingResult
 import logging
+from django.utils import timezone
+import datetime
+
 
 logger = logging.getLogger(__name__)
 load_dotenv()
@@ -285,23 +288,32 @@ class ProductFittingGenerateDetailView(APIView):
         user.is_fitting = True
         user.save(update_fields=["is_fitting"])
 
-        # 상품별 태스크를 group으로 묶어 한꺼번에 예약
-        tasks = [
-            chain(
-                run_vto_edit_url_task.s(person_url, product.image, prompt),   # ① VTO 생성
-                edit_bg_task.s(),
-                save_to_s3_and_db.s(user.id, product.id)         # ② S3+DB 저장
-            )
-            for product in products
+        batch_size = 3
+        batches = [
+            products[i:i + batch_size]
+            for i in range(0, len(products), batch_size)
         ]
 
-        job = group(tasks).apply_async()   # 비동기 예약
+        # 기준 시간
+        now = timezone.now()
+
+        for idx, product in enumerate(products):
+            task_chain = chain(
+                run_vto_edit_url_task.s(person_url, product.image, prompt),
+                edit_bg_task.s(),
+                save_to_s3_and_db.s(user.id, product.id),
+            )
+            # 3개마다 1초씩 지연: idx 0,1,2 -> 0s, 3,4,5 -> 1s, …
+            seconds_delay = idx // 2
+            eta = now + datetime.timedelta(seconds=seconds_delay)
+            # 개별적으로 ETA 스케줄
+            task_chain.apply_async(eta=eta)
 
         return Response(
             {
-                "message": "가상 피팅 작업이 병렬로 예약되었습니다.",
-                "task_group_id": job.id,
-                "total_products": products.count()
+                "message": "가상 피팅 작업이 3개씩 1초 간격으로 큐에 예약되었습니다.",
+                "total_products": len(products),
+                "mock": self.mock
             },
             status=202
         )
@@ -483,20 +495,33 @@ class ProductFittingGenerateMockDetailView(APIView):
         user.is_fitting = True
         user.save(update_fields=["is_fitting"])
 
-        tasks = [
-            chain(
+        # 1) 제품을 3개씩 묶어 배치 생성
+        batch_size = 3
+        batches = [
+            products[i:i + batch_size]
+            for i in range(0, len(products), batch_size)
+        ]
+
+        # 기준 시간
+        now = timezone.now()
+
+        for idx, product in enumerate(products):
+            task_chain = chain(
                 RUN_VTO.s(person_url, product.image, prompt),
                 EDIT_BG.s(),
-                SAVE.s(user.id, product.id)
+                SAVE.s(user.id, product.id),
             )
-            for product in products
-        ]
-        job = group(tasks).apply_async()
+            # 3개마다 1초씩 지연: idx 0,1,2 -> 0s, 3,4,5 -> 1s, …
+            seconds_delay = idx // 2
+            eta = now + datetime.timedelta(seconds=seconds_delay)
+            # 개별적으로 ETA 스케줄
+            task_chain.apply_async(eta=eta)
 
         return Response(
-            {"message": "가상 피팅 작업이 병렬로 예약되었습니다.",
-             "task_group_id": job.id,
-             "total_products": products.count(),
-             "mock": self.mock},
+            {
+                "message": "가상 피팅 작업이 3개씩 1초 간격으로 큐에 예약되었습니다.",
+                "total_products": len(products),
+                "mock": self.mock
+            },
             status=202
         )
