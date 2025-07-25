@@ -37,6 +37,12 @@
 #     "django.contrib.sessions",
 #     "django.contrib.messages",
 #     "django.contrib.staticfiles",
+#     "rest_framework",
+#     "drf_yasg",
+#     "user",
+#     "product",
+#     "order",
+#     "fitting", 
 # ]
 
 # MIDDLEWARE = [
