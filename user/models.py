@@ -34,3 +34,24 @@ class CartItem(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.product.name} x {self.quantity}"
+
+class UserImage(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        verbose_name="사용자 아이디",
+        related_name="user_images"
+    )
+    image = models.CharField(max_length=255, verbose_name="사용자 이미지 주소")
+    is_fitting = models.BooleanField(default=False,verbose_name="가상피팅 유무")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="생성일")
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True, verbose_name="수정일")
+    deleted_at = models.DateTimeField(null=True, blank=True, verbose_name="삭제일")
+
+    class Meta:
+        db_table = 'user_image'
+        verbose_name = "사용자 사진"
+        verbose_name_plural = "사용자 사진 목록"
+
+    def __str__(self):
+        return f"{self.user.username} - {self.image}"
