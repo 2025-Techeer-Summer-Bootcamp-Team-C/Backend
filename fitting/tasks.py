@@ -9,6 +9,7 @@ from product.models import Product
 from fitting.models import FittingResult
 from fitting.utils import upload_fitting_image_to_s3, upload_bytes
 from celery import group, chain
+from celery.exceptions import Ignore
 
 
 BITSTUDIO_API_KEY = os.environ["BITSTUDIO_API_KEY"]
@@ -118,7 +119,7 @@ def run_vto_edit_url_task(self, person_url, outfit_url, prompt):
         vto_image_id = r.json()[0]["id"]          # ← 결과 이미지 ID
 
         # ② 완료 폴링 (2초 × 30 = 60초)
-        for _ in range(30):
+        for _ in range(50):
             info = requests.get(
                 f"https://api.bitstudio.ai/images/{vto_image_id}",
                 headers={"Authorization": f"Bearer {BITSTUDIO_API_KEY}"},
@@ -128,7 +129,7 @@ def run_vto_edit_url_task(self, person_url, outfit_url, prompt):
             if info.get("status") == "completed" and info.get("path"):
                 return vto_image_id              # ✅ 이미지 ID 반환
             if info.get("status") == "failed":
-                return None
+                raise self.retry(exc=RuntimeError("VTO status=failed"))
             time.sleep(2)
 
         return None  # 타임아웃
@@ -142,6 +143,9 @@ def run_vto_edit_url_task(self, person_url, outfit_url, prompt):
     rate_limit='3/s'
 )
 def edit_bg_task(self, vto_image_id):
+    if not vto_image_id:
+        # None 은 스킵
+        raise Ignore("No VTO ID, skip edit_bg_task")
     # 1) Edit 요청
     r = requests.post(
         f"https://api.bitstudio.ai/images/{vto_image_id}/edit",
