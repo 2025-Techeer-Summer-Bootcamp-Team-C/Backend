@@ -1,5 +1,5 @@
 from PIL import Image
-import io, os, uuid, boto3
+import io, os, uuid, boto3, mimetypes
 
 s3 = boto3.client(
     "s3",
@@ -32,15 +32,22 @@ def compress_image_bytes(image_bytes, quality=90):
         return buffer.getvalue()
     
 
-def upload_bytes(prefix: str, data: bytes, ext: str = "jpg") -> str:
+def upload_video_to_s3(prefix: str, data: bytes, ext: str = "jpg") -> str:
     key = f"{prefix}{uuid.uuid4()}.{ext}"
+
+    # 확장자 → MIME 타입 자동 매핑
+    mime_type, _ = mimetypes.guess_type(f"file.{ext}")
+    # 못 찾으면 기본값
+    if mime_type is None:
+        mime_type = "application/octet-stream"
+
     s3.upload_fileobj(
         io.BytesIO(data),
         BUCKET,
         key,
         ExtraArgs={
-            "ContentType": f"image/{ext}",
-            "ContentDisposition": "inline",
+            "ContentType": mime_type,       # 예: video/mp4, image/jpeg
+            "ContentDisposition": "inline", # 브라우저에서 바로 재생/표시
         },
     )
     return f"{CLOUDFRONT_DOMAIN}/{key}"
