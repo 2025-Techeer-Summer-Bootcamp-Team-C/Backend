@@ -1,7 +1,7 @@
 from django.contrib.auth import authenticate
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import User, CartItem
+from .models import User, CartItem, UserImage
 
 class SignUpSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(write_only=True)
@@ -72,3 +72,8 @@ class CartItemCreateSerializer(serializers.Serializer):
     
 class CartItemUpdateSerializer(serializers.Serializer):
     quantity = serializers.IntegerField(min_value=0) 
+
+class UserImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserImage
+        fields = ['id', 'image']
