@@ -5,7 +5,6 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from drf_yasg.utils import swagger_auto_schema
 
-from product.models import Category
 from .serializers import CategoryWithProductsSerializer, CategoryCreateSerializer
 
 from drf_yasg import openapi
@@ -40,12 +39,11 @@ class CategoryProductByIdView(APIView):
             'data': serializer.data
         }, status=200)
 
-class CategoryCreateView(APIView):
+class CategoryView(APIView):
     permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
         operation_summary="카테고리 생성",
-        operation_description="정수 형태의 카테고리 ID를 받아 새로운 카테고리를 생성합니다.",
         request_body=CategoryCreateSerializer,
         responses={
             201: openapi.Response(
@@ -69,4 +67,3 @@ class CategoryCreateView(APIView):
             {"message": "카테고리가 생성되었습니다."},
             status=status.HTTP_201_CREATED
         )
-

@@ -1,5 +1,6 @@
 from product.models import Category, Product
 from rest_framework import serializers
+from product.models import Category
 
 class ProductInCategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -13,8 +14,9 @@ class CategoryWithProductsSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'products')
 
 class CategoryCreateSerializer(serializers.ModelSerializer):
-    category= serializers.IntegerField()
+    # 클라이언트로부터 category_name 필드로 입력을 받되, 내부적으로는 Category.name 필드에 매핑
+    category_name = serializers.CharField(source='name')
 
     class Meta:
         model = Category
-        fields = ['category']
+        fields = ['category_name']
