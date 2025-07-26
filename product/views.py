@@ -144,20 +144,11 @@ class ProductDetailImageView(APIView):
         }, status=201)
         
 class ProductFittingImageView(APIView):
-    """
-    특정 상품(product_id)과 특정 user_image(id) 파라미터(쿼리) 기반 fitting_result image 반환
-    """
     permission_classes = [AllowAny]
 
     @swagger_auto_schema(
         operation_summary="상품별 가상 피팅 이미지 조회",
-        operation_description="상품 ID와 user_image 파라미터(pk)를 받아 해당 조합의 피팅 결과 이미지를 반환합니다.",
-        manual_parameters=[
-            openapi.Parameter(
-                'user_image', openapi.IN_QUERY, type=openapi.TYPE_INTEGER, required=True,
-                description="user_image 테이블의 id"
-            )
-        ],
+        operation_description="상품 ID와 user_image(경로 파라미터)를 받아 해당 조합의 피팅 결과 이미지를 반환합니다.",
         responses={
             200: openapi.Response(
                 description="가상 피팅 결과 이미지 반환",
@@ -172,20 +163,15 @@ class ProductFittingImageView(APIView):
             404: "결과 없음",
         }
     )
-    def get(self, request, product_id):
-        user_image_id = request.GET.get("user_image")
-        if not user_image_id:
-            return Response({"error": "user_image 파라미터가 필요합니다."}, status=400)
-
-        # user_image 존재 확인
+    def get(self, request, product_id, user_image):
+        # user_image는 path 파라미터로 직접 넘어옴
         try:
-            user_image = UserImage.objects.get(id=user_image_id)
+            user_image_obj = UserImage.objects.get(id=user_image)
         except UserImage.DoesNotExist:
             return Response({"error": "user_image를 찾을 수 없습니다."}, status=404)
 
-        # fitting_result에서 해당 조합의 결과 조회
         fitting_result = FittingResult.objects.filter(
-            user_image=user_image, product_id=product_id
+            user_image=user_image_obj, product_id=product_id
         ).order_by('-created_at').first()
 
         if not fitting_result or not fitting_result.image:
@@ -193,6 +179,6 @@ class ProductFittingImageView(APIView):
 
         return Response({
             "product_id": product_id,
-            "user_image_id": user_image.id,
+            "user_image_id": user_image_obj.id,
             "fitting_image": fitting_result.image
         }, status=200)
