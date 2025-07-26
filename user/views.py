@@ -7,7 +7,7 @@ from rest_framework import generics, permissions, status, parsers
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.conf import settings
-from .serializers import SignUpSerializer, LoginSerializer, LogoutSerializer, CartItemCreateSerializer, CartItemSerializer, CartItemUpdateSerializer
+from .serializers import SignUpSerializer, LoginSerializer, LogoutSerializer, CartItemCreateSerializer, CartItemSerializer, CartItemUpdateSerializer, UserImageSerializer
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -15,7 +15,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from django.conf import settings
 from .utils import upload_profile_image_to_s3
-from .models import CartItem
+from .models import CartItem, UserImage
 from product.models import Product
 
 class SignUpAPI(generics.CreateAPIView):
@@ -296,3 +296,16 @@ class UpdateProfileImageAPI(APIView):
             "message": "프로필 이미지가 성공적으로 변경되었습니다.",
             "profile_image_url": user.profile_image
         }, status=status.HTTP_200_OK)
+        
+class UserImageListAPI(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="사용자 이미지 목록 조회",
+        operation_description="로그인한 사용자의 이미지 목록을 반환합니다.",
+        responses={200: UserImageSerializer(many=True)},
+    )
+    def get(self, request):
+        user_images = UserImage.objects.filter(user=request.user)
+        serializer = UserImageSerializer(user_images, many=True)
+        return Response(serializer.data)
