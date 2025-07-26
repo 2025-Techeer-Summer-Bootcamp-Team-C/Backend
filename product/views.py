@@ -6,6 +6,8 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from django.db.models import Q
 from rest_framework.permissions import IsAuthenticated
+from user.models import UserImage
+from fitting.models import FittingResult
 
 from .models import Product, ProductImage
 from .utils import upload_product_image
@@ -60,54 +62,20 @@ class ProductCreateListView(APIView):
     @swagger_auto_schema(
         operation_id="listProducts",
         operation_summary="상품 정보 리스트",
-        manual_parameters=[
-            openapi.Parameter(
-                name="show_fitting",
-                in_=openapi.IN_QUERY,
-                type=openapi.TYPE_BOOLEAN,
-                required=False,
-                description="true: 로그인한 사용자의 피팅 합성 이미지 / false: 상품 기본 이미지",
-                default=False,
-            ),
-        ],
         responses={200: "상품 리스트", 401: "로그인 필요"},
     )
     def get(self, request):
-        show_fitting = request.GET.get('show_fitting', 'false').lower() == 'true'
         result = []
-
-        # product는 항상 기준이 되므로 미리 가져옴
         products = Product.objects.filter(Q(is_deleted=False) | Q(is_deleted__isnull=True))
-
-        if show_fitting:
-            # ✅ 인증 여부 확인
-            if not request.user.is_authenticated:
-                return Response({"detail": "로그인이 필요합니다."}, status=401)
-
-            # 현재 사용자 기준으로 fitting result 가져옴
-            fittings = FittingResult.objects.filter(user=request.user, is_deleted=False)
-            fitting_map = {f.product_id: f.image for f in fittings if f.product_id and f.image}
-
-            for product in products:
-                image = fitting_map.get(product.id, product.image)  # 피팅 결과가 없으면 기본 이미지 사용
-                result.append({
-                    "product_id": product.id,
-                    "name": product.name,
-                    "price": product.price,
-                    "image": image,
-                    "content": product.content
-                })
-        else:
-            # 🟢 기본 상품 모델 이미지만 보여줌 (비회원도 접근 가능)
-            for product in products:
-                result.append({
-                    "product_id": product.id,
-                    "name": product.name,
-                    "price": product.price,
-                    "image": product.image,
-                    "content": product.content
-                })
-
+        # show_fitting 파라미터/분기 완전 삭제!
+        for product in products:
+            result.append({
+                "product_id": product.id,
+                "name": product.name,
+                "price": product.price,
+                "image": product.image,  # 항상 상품 기본 이미지만 반환!
+                "content": product.content
+            })
         return Response({'products': result}, status=200)
     
 # 상품 상세 정보(GET) & 이미지 다중 업로드(POST) - 하나의 클래스
@@ -174,3 +142,43 @@ class ProductDetailImageView(APIView):
             "product_id": product.id,
             "uploaded_images": uploaded_urls
         }, status=201)
+        
+class ProductFittingImageView(APIView):
+    permission_classes = [AllowAny]
+
+    @swagger_auto_schema(
+        operation_summary="상품별 가상 피팅 이미지 조회",
+        operation_description="상품 ID와 user_image(경로 파라미터)를 받아 해당 조합의 피팅 결과 이미지를 반환합니다.",
+        responses={
+            200: openapi.Response(
+                description="가상 피팅 결과 이미지 반환",
+                examples={
+                    "application/json": {
+                        "product_id": 1,
+                        "user_image_id": 5,
+                        "fitting_image": "https://.../fit.jpg"
+                    }
+                }
+            ),
+            404: "결과 없음",
+        }
+    )
+    def get(self, request, product_id, user_image):
+        # user_image는 path 파라미터로 직접 넘어옴
+        try:
+            user_image_obj = UserImage.objects.get(id=user_image)
+        except UserImage.DoesNotExist:
+            return Response({"error": "user_image를 찾을 수 없습니다."}, status=404)
+
+        fitting_result = FittingResult.objects.filter(
+            user_image=user_image_obj, product_id=product_id
+        ).order_by('-created_at').first()
+
+        if not fitting_result or not fitting_result.image:
+            return Response({"error": "피팅 이미지 결과가 없습니다."}, status=404)
+
+        return Response({
+            "product_id": product_id,
+            "user_image_id": user_image_obj.id,
+            "fitting_image": fitting_result.image
+        }, status=200)
