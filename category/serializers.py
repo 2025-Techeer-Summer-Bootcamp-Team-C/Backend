@@ -11,3 +11,10 @@ class CategoryWithProductsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = ('id', 'name', 'products')
+
+class CategoryCreateSerializer(serializers.ModelSerializer):
+    category= serializers.IntegerField()
+
+    class Meta:
+        model = Category
+        fields = ['category']
