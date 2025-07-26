@@ -15,7 +15,7 @@ import requests
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from celery import chord
 from .tasks import run_vto_url_task, save_to_s3_and_db, run_vto_edit_url_task, edit_bg_task, generate_fitting_video_task, fake_run_vto, fake_edit_bg, fake_save_to_s3_and_db
-from .utils      import upload_bytes, upload_url, upload_profile_image_to_s3
+from .utils      import upload_profile_image_to_s3
 from .models     import UserImage
 from celery import group, chain
 from product.models import Product
@@ -331,47 +331,48 @@ class ProductFittingGenerateDetailView(APIView):
 class ProductFittingVideoGenerateView(APIView):
     permission_classes = [IsAuthenticated]
 
+    _path_params = [
+        openapi.Parameter(
+            "product_id", openapi.IN_PATH, description="상품 ID",
+            type=openapi.TYPE_INTEGER, required=True
+        ),
+        openapi.Parameter(
+            "user_image_id", openapi.IN_PATH, description="사용자 이미지 ID",
+            type=openapi.TYPE_INTEGER, required=True
+        ),
+    ]
+
     @swagger_auto_schema(
         operation_summary="상품별 가상 피팅 영상 생성 요청",
         operation_description="가상 피팅 이미지로부터 AI 영상을 생성 요청을 보냅니다. 이미 진행 중이거나 완료된 경우 상태에 따라 적절한 응답을 반환합니다.",
-        manual_parameters=[
-            openapi.Parameter(
-                name="product_id",
-                in_=openapi.IN_PATH,
-                type=openapi.TYPE_INTEGER,
-                required=True,
-                description="영상 생성을 요청할 상품 ID"
-            )
-        ],
+        manual_parameters=_path_params,
         responses={
             202: openapi.Response(
-                description="영상 생성 요청을 받았습니다. 잠시 후 상태를 확인하세요.",
+                description="요청 수락 또는 이미 진행 중",
                 examples={
-                    "application/json": {"detail": "영상 생성 요청을 받았습니다. 잠시 후 상태를 확인하세요."}
-                }
-            ),
-            202: openapi.Response(
-                description="이미 영상 생성 요청이 진행 중입니다.",
-                examples={
-                    "application/json": {"detail": "이미 영상 생성 요청이 진행 중입니다."}
-                }
+                    "application/json": {
+                        "detail": "영상 생성 요청을 받았습니다. 잠시 후 상태를 확인하세요."
+                    }
+                },
             ),
             400: openapi.Response(
-                description="영상이 이미 생성되어 있거나 잘못된 요청",
+                description="이미 영상이 존재하거나 잘못된 요청",
                 examples={
                     "application/json": {"detail": "이미 영상이 생성되어 있습니다."}
-                }
+                },
             ),
             404: openapi.Response(
-                description="해당 상품 또는 피팅 결과를 찾을 수 없습니다."
-            )
+                description="해당 상품·사용자 이미지·피팅 결과를 찾을 수 없습니다."
+            ),
         },
     )
-    def post(self, request, product_id):
+    def post(self, request, product_id: int, user_image_id: int):
         product = get_object_or_404(Product, pk=product_id)
+        user_image = get_object_or_404(UserImage, pk=user_image_id, user=request.user)
+        
         fitting = get_object_or_404(
             FittingResult,
-            user=request.user,
+            user_image=user_image,
             product=product
         )
         
@@ -420,12 +421,51 @@ class ProductFittingVideoGenerateView(APIView):
             status=status.HTTP_202_ACCEPTED
         )
         
+    @swagger_auto_schema(
+        operation_summary="가상 피팅 비디오 상태 조회",
+        operation_description="현재 영상 생성 상태를 확인하고, 완료 시 S3 URL을 반환합니다.",
+        manual_parameters=_path_params,
+        responses={
+            200: openapi.Response(
+                description="현재 상태 및 비디오 URL",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "status": openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="pending | processing | completed | failed"
+                        ),
+                        "video_url": openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="completed 상태일 때만 URL"
+                        ),
+                    },
+                ),
+            ),
+            404: openapi.Response(description="리소스를 찾을 수 없음"),
+        },
+    )
+    def get(self, request, product_id: int, user_image_id: int):
+        product = get_object_or_404(Product, pk=product_id)
+        user_image = get_object_or_404(UserImage, pk=user_image_id, user=request.user)
+        fitting = get_object_or_404(
+            FittingResult, user_image=user_image, product=product
+        )
+
+        return Response(
+            {
+                "status": fitting.status,
+                "video_url": fitting.video if fitting.status == "completed" else None,
+            },
+            status=status.HTTP_200_OK,
+        )
+        
 class ProductFittingVideoStatusView(APIView):
     permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
         operation_summary="가상 피팅 비디오 상태 조회",
-        operation_description="지정된 상품 ID의 가상 피팅 영상 생성 상태를 확인하고, 완료된 경우 S3에 저장된 비디오 URL을 반환합니다.",
+        operation_description="지정된 상품 ID와 사용자의 가상 피팅 영상 생성 상태를 확인하고, 완료된 경우 S3에 저장된 비디오 URL을 반환합니다.",
         manual_parameters=[
             openapi.Parameter(
                 name="product_id",

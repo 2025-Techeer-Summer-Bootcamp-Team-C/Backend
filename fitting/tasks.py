@@ -7,7 +7,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from user.models import User, UserImage
 from product.models import Product
 from fitting.models import FittingResult
-from fitting.utils import upload_fitting_image_to_s3, upload_bytes
+from fitting.utils import upload_fitting_image_to_s3, upload_video_to_s3
 from celery import group, chain
 from celery.exceptions import Ignore
 
@@ -212,10 +212,10 @@ def generate_fitting_video_task(fitting_id, task_id):
     video_bytes = video_resp.content
 
     # S3 업로드 via utils.upload_bytes
-    # prefix 에 사용자·상품 구분자 추가
-    prefix = f"fitting_videos/{fitting.user.id}/{fitting.product.id}/"
+    # prefix 에 사용자 이미지 id,상품 구분자 추가
+    prefix = f"fitting_videos/{fitting.user_image.id}/{fitting.product.id}/"
     # ext="mp4" 로 지정
-    s3_url = upload_bytes(prefix, video_bytes, ext="mp4")
+    s3_url = upload_video_to_s3(prefix, video_bytes, ext="mp4")
 
     # DB 업데이트
     fitting.video = s3_url
