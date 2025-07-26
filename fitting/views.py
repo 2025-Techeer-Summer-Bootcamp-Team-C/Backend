@@ -321,8 +321,9 @@ class ProductFittingGenerateDetailView(APIView):
         
         return Response(
             {
-                "message": "가상 피팅 작업이 3개씩 1초 간격으로 큐에 예약되었습니다.",
+                "message": "가상 피팅 작업이 큐에 예약되었습니다.",
                 "total_products": len(products),
+                "user_image_id": user_image.id,
             },
             status=202
         )
