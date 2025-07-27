@@ -10,6 +10,7 @@ from fitting.models import FittingResult
 from fitting.utils import upload_fitting_image_to_s3, upload_video_to_s3
 from celery import group, chain
 from celery.exceptions import Ignore
+from PIL import Image
 
 
 BITSTUDIO_API_KEY = os.environ["BITSTUDIO_API_KEY"]
@@ -58,21 +59,13 @@ def run_vto_url_task(self, person_url, outfit_url, prompt):
         raise self.retry(exc=exc)
     
 @shared_task(bind=True, max_retries=2, default_retry_delay=10)
-def save_to_s3_and_db(self, vto_url: str, user_image_id: int, product_id: int):
-    if not vto_url:
-        return None   # 이전 태스크 실패한 경우
+def save_to_s3_and_db(self, resized_bytes: bytes, user_image_id: int, product_id: int):
 
     try:
-        # 1) 이미지 다운로드
-        resp = requests.get(vto_url, timeout=30)
-        resp.raise_for_status()
-        img_bytes = resp.content
-
-        # 2) S3 업로드
         s3_url = upload_fitting_image_to_s3(
             user_image_id=user_image_id,
             product_id=product_id,
-            image_data=img_bytes
+            image_data=resized_bytes
         )
 
         # 3) DB 저장
@@ -177,6 +170,25 @@ def edit_bg_task(self, vto_image_id):
             return None
         time.sleep(5)
     return None
+
+@shared_task(bind=True, autoretry_for=(requests.RequestException,),retry_backoff=5, retry_kwargs={'max_retries': 3}, queue="io")
+def download_image_task(self, vto_url: str):
+    resp = requests.get(vto_url, timeout=30)
+    resp.raise_for_status()
+    return resp.content
+
+
+def resize_image_keep_ratio(b: bytes, max_size=(800, 800), quality=90):
+    with Image.open(io.BytesIO(b)) as img:
+        img = img.convert("RGB")
+        img.thumbnail(max_size, Image.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, "JPEG", quality=quality, optimize=True)
+        return buf.getvalue()
+
+@shared_task(bind=True, queue="cpu")
+def resize_image_task(self, img_bytes: bytes):
+    return resize_image_keep_ratio(img_bytes)
 
 @shared_task
 def generate_fitting_video_task(fitting_id, task_id):

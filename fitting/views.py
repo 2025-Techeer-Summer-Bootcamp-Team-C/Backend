@@ -14,7 +14,7 @@ from .serializers import GenerateVTORequestSerializer, VTORequestSerializer, Gen
 import requests
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from celery import chord
-from .tasks import run_vto_url_task, save_to_s3_and_db, run_vto_edit_url_task, edit_bg_task, generate_fitting_video_task, fake_run_vto, fake_edit_bg, fake_save_to_s3_and_db
+from .tasks import run_vto_url_task, save_to_s3_and_db, run_vto_edit_url_task, edit_bg_task, generate_fitting_video_task, fake_run_vto, fake_edit_bg, fake_save_to_s3_and_db, download_image_task, resize_image_task
 from .utils      import upload_profile_image_to_s3
 from .models     import UserImage
 from celery import group, chain
@@ -311,6 +311,8 @@ class ProductFittingGenerateDetailView(APIView):
             task_chain = chain(
                 run_vto_edit_url_task.s(person_url, product.image, prompt),
                 edit_bg_task.s(),
+                download_image_task.s(),
+                resize_image_task.s(),
                 save_to_s3_and_db.s(user_image.id, product.id),
             )
             # 3개마다 1초씩 지연: idx 0,1,2 -> 0s, 3,4,5 -> 1s, …
