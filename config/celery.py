@@ -16,7 +16,7 @@ app.conf.task_routes = {
     "fitting.tasks.edit_bg_task":          {"queue": "io"},
     "fitting.tasks.save_to_s3_and_db":     {"queue": "io"},
     # CPU 작업
-    "fitting.tasks.resize":                {"queue": "cpu"},
+    "fitting.tasks.resize_image_task":     {"queue": "cpu"},
 }
 
 app.conf.task_queues = (
