@@ -479,7 +479,7 @@ class ProductFittingGenerateMockDetailView(APIView):
         if user.is_fitting:
             return Response({"error": "이미 가상 피팅을 완료했거나 피팅 중입니다."}, status=400)
 
-        person_url = user.profile_image
+        person_url = UserImage.objects.get(pk=1).image
         if not person_url:
             return Response({"error": "사용자 사진이 없습니다."}, status=400)
 

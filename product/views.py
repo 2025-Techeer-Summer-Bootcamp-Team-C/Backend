@@ -13,6 +13,11 @@ from .models import Product, ProductImage
 from .utils import upload_product_image
 from fitting.models import FittingResult
 
+from typing import Dict, List
+from celery import group
+import time
+from .tasks import resize_one
+
 class ProductCreateListView(APIView):
     permission_classes = [AllowAny]
     parser_classes = (MultiPartParser, FormParser)
@@ -182,3 +187,42 @@ class ProductFittingImageView(APIView):
             "user_image_id": user_image_obj.id,
             "fitting_image": fitting_result.image
         }, status=200)
+        
+class ResizeBenchView(APIView):
+    """
+    POST /api/bench/resize
+      - form‑data: image_file (필수)
+    Celery 워커가 리사이즈 100장을 처리하는 데 걸린 총 시간을 반환
+    """
+    permission_classes = [AllowAny]
+    parser_classes = (MultiPartParser, FormParser)
+
+    @swagger_auto_schema(
+        operation_id="benchmarkResize",
+        operation_summary="Celery 워커 벤치마크 (스레드·프로세스 풀 X)",
+        manual_parameters=[
+            openapi.Parameter(
+                "image_file",
+                openapi.IN_FORM,
+                description="테스트용 이미지(JPEG/PNG) 1장",
+                type=openapi.TYPE_FILE, required=True
+            )
+        ],
+        responses={200: "OK", 400: "Bad Request"},
+    )
+    def post(self, request):
+        time.sleep(5)
+        image_file = request.FILES.get("image_file")
+        if not image_file:
+            return Response({"error": "image_file 필드가 필요합니다."}, status=400)
+
+        original = image_file.read()
+        COPIES = 200
+        images: List[bytes] = [original] * COPIES
+
+        # Celery 그룹 태스크 발행
+        g = group(resize_one.s(b) for b in images)
+
+        start = time.perf_counter()
+        g.apply_async(ignore_result=True)
+        return Response({"msg": "queued"}, status=202)
