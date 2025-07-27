@@ -1,12 +1,12 @@
 from product.models import Category
-from rest_framework import status
+from rest_framework import status, generics
 from rest_framework.views import APIView
+from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from drf_yasg.utils import swagger_auto_schema
 
-from .serializers import CategoryWithProductsSerializer, CategoryCreateSerializer
-
+from .serializers import CategoryWithProductsSerializer, CategoryCreateSerializer, CategorySerializer
 from drf_yasg import openapi
 
 class CategoryProductByIdView(APIView):
@@ -67,3 +67,23 @@ class CategoryView(APIView):
             {"message": "카테고리가 생성되었습니다."},
             status=status.HTTP_201_CREATED
         )
+class CategoryListView(generics.ListAPIView):
+    """
+    전체 카테고리 조회 (is_deleted=False)
+    """
+    queryset = Category.objects.filter(is_deleted=False).order_by('id')
+    serializer_class = CategorySerializer
+    permission_classes = [IsAuthenticated]
+    
+    @swagger_auto_schema(
+        operation_summary="전체 카테고리 조회",
+        operation_description="삭제되지 않은 모든 카테고리를 조회합니다.",
+        responses={
+            200: openapi.Response(
+                description="전체 카테고리 조회 완료",
+                schema=CategorySerializer(many=True)
+            )
+        }
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
