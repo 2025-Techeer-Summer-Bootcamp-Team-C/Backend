@@ -11,4 +11,5 @@ urlpatterns = [
     path('cart/<int:cart_product_id>', CartItemUpdateAPIView.as_view(), name='cart-update'),
     path("profile-image", UpdateProfileImageAPI.as_view(), name="update_profile_image"),
     path("images", UserImageListAPI.as_view(), name="user_image_list"),
+    path('images/<int:user_image_id>', UserImageDeleteAPI.as_view(), name='users_image_delete'),
 ]

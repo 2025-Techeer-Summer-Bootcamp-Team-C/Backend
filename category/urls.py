@@ -1,8 +1,9 @@
 # category/urls.py
 
 from django.urls import path
-from .views import CategoryProductByIdView
+from .views import CategoryProductByIdView, CategoryView
 
 urlpatterns = [
-    path('', CategoryProductByIdView.as_view(), name='category-products-list'),
+    path('<int:category_id>', CategoryProductByIdView.as_view(), name='category-products-list'),
+    path('', CategoryView.as_view(), name='create-category'),
 ]

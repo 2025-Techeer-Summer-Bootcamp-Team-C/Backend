@@ -17,6 +17,9 @@ from django.conf import settings
 from .utils import upload_profile_image_to_s3
 from .models import CartItem, UserImage
 from product.models import Product
+from django.shortcuts import get_object_or_404
+from django.db import transaction
+from fitting.models import FittingResult
 
 class SignUpAPI(generics.CreateAPIView):
     serializer_class = SignUpSerializer
@@ -30,7 +33,7 @@ class SignUpAPI(generics.CreateAPIView):
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = serializer.save() 
+        user = serializer.save()
             
         return Response({
             "message": "회원가입이 완료되었습니다.",
@@ -309,3 +312,24 @@ class UserImageListAPI(APIView):
         user_images = UserImage.objects.filter(user=request.user)
         serializer = UserImageSerializer(user_images, many=True)
         return Response(serializer.data)
+
+class UserImageDeleteAPI(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="사용자 이미지 및 피팅 결과 삭제",
+        operation_description="user_image_id로 사용자 이미지를 삭제하며, 연결된 모든 fitting_result(가상 피팅 결과)도 함께 삭제합니다.",
+        responses={
+            204: "삭제 성공",
+            403: "권한 없음",
+            404: "존재하지 않음",
+        }
+    )
+    def delete(self, request, user_image_id):
+        user_image = get_object_or_404(UserImage, pk=user_image_id, user=request.user)
+        with transaction.atomic():
+            # 연결된 fitting_result 모두 삭제
+            FittingResult.objects.filter(user_image=user_image).delete()
+            # user_image 자체도 삭제
+            user_image.delete()
+        return Response(status=204)
