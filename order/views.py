@@ -15,6 +15,7 @@ class SingleOrderCreateView(APIView):
 
     @swagger_auto_schema(
         request_body=SingleOrderCreateSerializer,
+        operation_summary="단일 상품 주문",
         responses={
             201: SingleOrderResponseSerializer,
             404: '상품을 찾을 수 없음',
@@ -59,6 +60,7 @@ class CartOrderCreateView(APIView):
 
     @swagger_auto_schema(
         request_body=CartOrderCreateSerializer,
+        operation_summary="장바구니 상품 주문",
         responses={
             201: CartOrderResponseSerializer,
             400: '선택된 장바구니 상품이 없습니다.',

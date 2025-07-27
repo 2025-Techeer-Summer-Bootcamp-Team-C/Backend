@@ -20,3 +20,9 @@ class CategoryCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = ['category_name']
+
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        # id, name, created/updated 타임스탬프만 노출
+        fields = ('id', 'name')
