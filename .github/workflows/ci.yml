@@ -6,7 +6,7 @@ on:
       - develop
   pull_request:
     branches:
-      - '**'  # 모든 브랜치 PR에도 실행 
+      - '**'  # 모든 브랜치 PR에도 실행  
 
 jobs:
   build-and-push:
