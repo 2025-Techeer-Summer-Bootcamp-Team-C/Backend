@@ -100,7 +100,7 @@ services:
     networks:
       - Backend-Net
 
-  celery_worker:
+  celery_io:
     build:
       context: .
     volumes:
@@ -109,6 +109,7 @@ services:
       celery -A config worker
       --pool=eventlet
       --concurrency=250
+      --queues=io
       --loglevel=info
     environment:
       - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
@@ -118,6 +119,29 @@ services:
       - backend
     restart: always
     tty: true
+    networks:
+      - Backend-Net
+    labels:
+      - "traefik.enable=false"
+
+  celery_cpu:
+    build:
+      context: .
+    volumes:
+      - ./:/app
+    command: >
+      celery -A config worker
+      --pool=prefork
+      --concurrency=4
+      --queues=cpu
+      -E --loglevel=info
+    environment:
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+      - DJANGO_SETTINGS_MODULE=config.settings.dev
+    depends_on:
+      - rabbitmq
+      - backend
+    restart: always
     networks:
       - Backend-Net
     labels:
@@ -153,7 +177,8 @@ services:
       - '5555:5555'
     depends_on:
       - rabbitmq
-      - celery_worker
+      - celery_io
+      - celery_cpu
       - celery_beat
     networks:
       - Backend-Net
