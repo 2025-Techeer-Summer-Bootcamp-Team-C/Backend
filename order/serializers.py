@@ -20,6 +20,10 @@ class SingleOrderResponseSerializer(serializers.Serializer):
     total_price = serializers.IntegerField()
     status = serializers.CharField()
     created_at = serializers.DateTimeField()
+    initial_credit  = serializers.IntegerField()
+    deducted_credit = serializers.IntegerField()
+    remaining_credit= serializers.IntegerField()
+    message         = serializers.CharField()
 
 class CartOrderCreateSerializer(serializers.Serializer):
     cart_product_ids = serializers.ListField(
@@ -44,4 +48,7 @@ class CartOrderResponseSerializer(serializers.Serializer):
         many=True,
         help_text="주문된 상품 상세 목록"
     )
-    message = serializers.CharField(help_text="응답 메시지")
+    initial_credit    = serializers.IntegerField()
+    deducted_credit   = serializers.IntegerField()
+    remaining_credit  = serializers.IntegerField()
+    message           = serializers.CharField()

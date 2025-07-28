@@ -10,6 +10,12 @@ class User(AbstractUser):
         verbose_name="사용자 이름",
         help_text="한글 포함 가능",
     )
+    credit = models.IntegerField(
+        default=300000,
+        verbose_name="크레딧(원)",
+        help_text="사용자 초기 크레딧은 300,000원입니다."
+    )
+
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="생성일")
     updated_at = models.DateTimeField(auto_now=True, null=True, blank=True, verbose_name="수정일")
     deleted_at = models.DateTimeField(null=True, blank=True, verbose_name="삭제일")

@@ -38,6 +38,7 @@ class SignUpAPI(generics.CreateAPIView):
         return Response({
             "message": "회원가입이 완료되었습니다.",
             "user_id": user.id,
+            "credit": user.credit,
         }, status=201)
                 
 class LoginView(APIView):
