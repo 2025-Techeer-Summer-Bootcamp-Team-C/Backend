@@ -190,7 +190,7 @@ def resize_image_keep_ratio(b: bytes, max_size=(800, 800), quality=90):
 def resize_image_task(self, img_bytes: bytes):
     return resize_image_keep_ratio(img_bytes)
 
-@shared_task(bind=True, queue="io")
+@shared_task
 def generate_fitting_video_task(fitting_id, task_id):
     fitting = FittingResult.objects.get(pk=fitting_id)
     video_url = None
