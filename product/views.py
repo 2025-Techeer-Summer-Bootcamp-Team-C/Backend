@@ -83,7 +83,7 @@ class ProductCreateListView(APIView):
             })
         return Response({'products': result}, status=200)
     
-# 상품 상세 정보(GET) & 이미지 다중 업로드(POST) - 하나의 클래스
+# 상품 상세 정보(GET)
 class ProductDetailImageView(APIView):
     permission_classes = [AllowAny]
     parser_classes = (MultiPartParser, FormParser)
