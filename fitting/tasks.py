@@ -111,8 +111,8 @@ def run_vto_edit_url_task(self, person_url, outfit_url, prompt):
         r.raise_for_status()
         vto_image_id = r.json()[0]["id"]          # ← 결과 이미지 ID
 
-        # ② 완료 폴링 (2초 × 30 = 60초)
-        for _ in range(50):
+        # ② 완료 폴링 (2초 × 100 = 200초)
+        for _ in range(100):
             info = requests.get(
                 f"https://api.bitstudio.ai/images/{vto_image_id}",
                 headers={"Authorization": f"Bearer {BITSTUDIO_API_KEY}"},
@@ -161,8 +161,8 @@ def edit_bg_task(self, vto_image_id):
         f"https://api.bitstudio.ai/images/versions/{result_id}"
     )
 
-    # 2) 폴링 (5 s × 36 = 3분)
-    for _ in range(36):
+    # 2) 폴링 (5 s × 50 = 5분)
+    for _ in range(50):
         info = requests.get(poll_url, headers={"Authorization": f"Bearer {BITSTUDIO_API_KEY}"}, timeout=15).json()
         if info["status"] == "completed" and info.get("path"):
             return info["path"]
