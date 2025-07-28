@@ -103,6 +103,7 @@ class ProductDetailImageView(APIView):
             .values_list('image', flat=True)
         )
         response_data = {
+            "category_id":  product.category_id,
             "product_id": product.id,
             "name": product.name,
             "content": product.content,
@@ -114,13 +115,13 @@ class ProductDetailImageView(APIView):
         return Response(response_data, status=200)
 
     @swagger_auto_schema(
-        operation_summary="상품 이미지 다중 업로드",
+        operation_summary="상품 이미지 업로드",
         manual_parameters=[
             openapi.Parameter(
                 name='images',
                 in_=openapi.IN_FORM,
                 type=openapi.TYPE_FILE,
-                description='업로드할 이미지 파일들 (여러 장 가능)',
+                description='업로드할 이미지 파일',
                 required=True,
             ),
         ],
