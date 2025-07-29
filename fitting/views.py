@@ -25,11 +25,14 @@ from .models import FittingResult
 import logging
 from django.utils import timezone
 import datetime
+from google import genai
+import google.generativeai as genai
 
 
 logger = logging.getLogger(__name__)
 load_dotenv()
 BITSTUDIO_API_KEY = os.getenv("BITSTUDIO_API_KEY")
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 class ProductFittingGenerateView(APIView):
     permission_classes = [IsAuthenticated]
@@ -238,6 +241,46 @@ plain white 배경으로 변경합니다.
             status=status.HTTP_202_ACCEPTED,
         )
         
+        
+def generate_style_prompt(image_file) -> str:
+    """
+    Gemini Vision 으로 체형·스타일을 초간단 분석해
+    VTO 프롬프트에 삽입할 문구를 반환한다.
+    """
+    try:
+        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+        model = genai.GenerativeModel("gemini-1.5-pro")
+
+        base_prompt = (
+            "당신은 전문 패션 스타일리스트입니다. "
+            "사진 속 사용자의 체형과 스타일을 단 한 문장(20자 내외)으로 요약해 주세요. "
+            "구체적이면서도 간결하게 영어로 답장해주세요."
+        )
+
+        contents = [
+            {"text": base_prompt},
+            {
+                "inline_data": {
+                    "mime_type": image_file.content_type,
+                    "data": image_file.read(),
+                }
+            },
+        ]
+
+        response = model.generate_content(contents, generation_config={"max_output_tokens": 60})
+        # Gemini 응답 형식 대응
+        analysis = (
+            response.text.strip()
+            if hasattr(response, "text")
+            else response.candidates[0].content.parts[0].text.strip()
+        )
+        # 혹시 모를 길이 초과 방지
+        return analysis[:120]
+
+    except Exception as e:
+        # 실패해도 서비스 전체가 죽지 않도록 기본 안내문 사용
+        return "중성적인 체형으로 다양한 룩에 무난하게 어울립니다."
+    
 class ProductFittingGenerateDetailView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
@@ -296,7 +339,18 @@ class ProductFittingGenerateDetailView(APIView):
         if not products.exists():
             return Response({"error": "상품이 없습니다."}, status=400)
 
-        prompt = "Using the outfit image as the pose, lighting, and background reference, replace the model with the input person so that the person now wears the same clothes in the exact pose and setting. Preserve the model photo’s camera angle, framing, and white-studio background, but swap in the input person’s face, skin tone, hair, and body proportions. Ensure the clothes fit naturally to the new body and the overall result looks realistic and high-quality."
+        profile_image.seek(0)
+        body_summary = generate_style_prompt(profile_image)
+        print(body_summary)
+        prompt = (
+            "Using the outfit image as the pose, lighting, and background reference, "
+            "replace the model with the input person so that the person now wears the same clothes "
+            "in the exact pose and setting. Preserve the model photo’s camera angle, framing, "
+            "and white-studio background, but swap in the input person’s face, skin tone, hair, "
+            "and body proportions. Ensure the clothes fit naturally to the new body and the overall "
+            "result looks realistic and high-quality. "
+            f"User Body Analysis: {body_summary}"
+        )
 
         batch_size = 3
         batches = [
